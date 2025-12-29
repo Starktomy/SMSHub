@@ -92,8 +92,12 @@ func setup(app *orz.App) error {
 	)
 	serialService.SetScheduledTaskStatusUpdater(schedulerService.UpdateLastRunStatusByMsgId)
 
-	// 8. 初始化 Handler
-	authHandler := handler.NewAuthHandler(logger, &appConfig)
+	// 8. 初始化 OIDC 和 Account Service
+	oidcService := service.NewOIDCService(logger, &appConfig)
+	accountService := service.NewAccountService(logger, oidcService, &appConfig)
+
+	// 9. 初始化 Handler
+	authHandler := handler.NewAuthHandler(logger, accountService)
 	propertyHandler := handler.NewPropertyHandler(logger, propertyService, notifier)
 	textMessageHandler := handler.NewTextMessageHandler(logger, textMessageService, textMessageRepo)
 	serialHandler := handler.NewSerialHandler(logger, serialService)
@@ -107,10 +111,10 @@ func setup(app *orz.App) error {
 		ScheduledTask: scheduledTaskHandler,
 	}
 
-	// 9. 设置 API 路由
+	// 10. 设置 API 路由
 	setupApi(app, handlers, &appConfig, logger)
 
-	// 10. 启动后台服务
+	// 11. 启动后台服务
 	background := context.Background()
 	// 启动串口服务
 	go serialService.Start()
@@ -171,6 +175,9 @@ func setupApi(app *orz.App, handlers *Handlers, appConfig *config.AppConfig, log
 
 	// 登录路由（不需要认证）
 	e.POST("/api/login", handlers.Auth.Login)
+	e.GET("/api/auth/config", handlers.Auth.GetAuthConfig)
+	e.GET("/api/auth/oidc/url", handlers.Auth.GetOIDCAuthURL)
+	e.POST("/api/auth/oidc/callback", handlers.Auth.OIDCCallback)
 
 	// API 路由组（需要认证）
 	api := e.Group("/api")

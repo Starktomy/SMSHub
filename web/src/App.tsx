@@ -1,9 +1,9 @@
 import {BrowserRouter, Route, Routes} from 'react-router-dom';
 import {QueryProvider} from './providers/QueryProvider';
-import {AuthProvider} from './contexts/AuthContext';
 import {ProtectedRoute} from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import OIDCCallback from './pages/OIDCCallback';
 import Dashboard from './pages/Dashboard';
 import Messages from './pages/Messages';
 import SerialControl from './pages/SerialControl';
@@ -14,30 +14,29 @@ import {Toaster} from "@/components/ui/sonner.tsx";
 function App() {
     return (
         <QueryProvider>
-            <AuthProvider>
-                <BrowserRouter>
-                    <Routes>
-                        {/* 公开路由 */}
-                        <Route path="/login" element={<Login/>}/>
+            <BrowserRouter>
+                <Routes>
+                    {/* 公开路由 */}
+                    <Route path="/login" element={<Login/>}/>
+                    <Route path="/oidc/callback" element={<OIDCCallback/>}/>
 
-                        {/* 受保护的路由 */}
-                        <Route
-                            path="/"
-                            element={
-                                <ProtectedRoute>
-                                    <Layout/>
-                                </ProtectedRoute>
-                            }
-                        >
-                            <Route index element={<Dashboard/>}/>
-                            <Route path="messages" element={<Messages/>}/>
-                            <Route path="serial" element={<SerialControl/>}/>
-                            <Route path="notifications" element={<NotificationChannels/>}/>
-                            <Route path="scheduled-tasks" element={<ScheduledTasksConfig/>}/>
-                        </Route>
-                    </Routes>
-                </BrowserRouter>
-            </AuthProvider>
+                    {/* 受保护的路由 */}
+                    <Route
+                        path="/"
+                        element={
+                            <ProtectedRoute>
+                                <Layout/>
+                            </ProtectedRoute>
+                        }
+                    >
+                        <Route index element={<Dashboard/>}/>
+                        <Route path="messages" element={<Messages/>}/>
+                        <Route path="serial" element={<SerialControl/>}/>
+                        <Route path="notifications" element={<NotificationChannels/>}/>
+                        <Route path="scheduled-tasks" element={<ScheduledTasksConfig/>}/>
+                    </Route>
+                </Routes>
+            </BrowserRouter>
 
             <Toaster/>
         </QueryProvider>

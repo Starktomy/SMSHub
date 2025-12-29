@@ -1,17 +1,16 @@
 import {Link, Outlet, useLocation, useNavigate} from 'react-router-dom';
 import {Bell, Clock, LayoutDashboard, LogOut, MessageSquare, Smartphone} from 'lucide-react';
 import {Button} from "@/components/ui/button.tsx";
-import {useAuth} from "@/contexts/AuthContext.tsx";
 import {useQuery} from "@tanstack/react-query";
 import {getVersion} from "@/api/property.ts";
 import {getStatus} from "@/api/serial.ts";
 import type {DeviceStatus} from "@/api/types.ts";
 import {cn} from "@/lib/utils.ts";
+import {toast} from 'sonner';
 
 export default function Layout() {
     const location = useLocation();
     const navigate = useNavigate();
-    const {username, logout} = useAuth();
 
     const navigation = [
         {name: '统计面板', href: '/', icon: LayoutDashboard},
@@ -45,7 +44,11 @@ export default function Layout() {
     };
 
     const handleLogout = () => {
-        logout();
+        // 清除 localStorage
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+
+        toast.success('已退出登录');
         navigate('/login');
     };
 

@@ -51,6 +51,7 @@ export interface MobileInfo {
     rsrp: number;
     rsrq: number;
     number: number;
+    uptime: string;              // 开机时长
 }
 
 // 设备状态响应（来自 Lua 脚本的 status_response）

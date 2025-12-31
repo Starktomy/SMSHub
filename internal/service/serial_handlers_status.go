@@ -39,7 +39,12 @@ func (s *SerialService) handleStatusResponse(msg *ParsedMessage) {
 	imsi := statusData.Mobile.Imsi
 	if len(imsi) > 5 {
 		plmn := imsi[:5]
-		statusData.Mobile.Operator = OperData[plmn]
+		statusData.Mobile.Operator = func() string {
+			if v, ok := OperData[plmn]; ok {
+				return v
+			}
+			return plmn
+		}()
 	}
 	s.deviceCache.Set(CacheKeyDeviceStatus, &statusData, CacheTTL)
 	s.logger.Debug("设备状态缓存已更新")

@@ -24,7 +24,7 @@ const (
 	// 缓存键
 	CacheKeyDeviceStatus = "device_status"
 	// 缓存刷新间隔
-	CacheRefreshInterval = 30 * time.Second
+	CacheRefreshInterval = 10 * time.Second
 	// 缓存过期时间
 	CacheTTL = 5 * time.Minute
 )

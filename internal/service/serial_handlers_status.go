@@ -7,10 +7,10 @@ import (
 )
 
 type StatusData struct {
-	CellularEnabled bool   `json:"cellular_enabled"`
-	Type            string `json:"type"`
-	Version         string `json:"version"` // Lua 脚本版本
-	Mobile          struct {
+	Flymode bool   `json:"flymode"` // 设备当前是否为飞行模式
+	Type    string `json:"type"`    // 消息类型
+	Version string `json:"version"` // Lua 脚本版本
+	Mobile  struct {
 		IsRegistered bool    `json:"is_registered"`
 		IsRoaming    bool    `json:"is_roaming"`
 		Iccid        string  `json:"iccid"`

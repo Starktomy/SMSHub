@@ -33,6 +33,7 @@ interface FormValues {
     webhookEnabled: boolean;
     webhookUrl: string;
     webhookMethod: string;
+    webhookContentType: string;
     webhookHeaders: string;
     webhookBody: string;
 
@@ -70,6 +71,7 @@ export default function NotificationChannels() {
         webhookEnabled: false,
         webhookUrl: '',
         webhookMethod: 'POST',
+        webhookContentType: 'application/json; charset=utf-8',
         webhookHeaders: '',
         webhookBody: '{"from": "{{from}}", "content": "{{content}}", "timestamp": "{{timestamp}}"}',
         emailEnabled: false,
@@ -141,6 +143,7 @@ export default function NotificationChannels() {
                     newFormValues.webhookEnabled = channel.enabled;
                     newFormValues.webhookUrl = (channel.config?.url as string) || '';
                     newFormValues.webhookMethod = (channel.config?.method as string) || 'POST';
+                    newFormValues.webhookContentType = (channel.config?.contentType as string) || 'application/json; charset=utf-8';
                     newFormValues.webhookBody = (channel.config?.body as string) || '{"from": "{{from}}", "content": "{{content}}", "timestamp": "{{timestamp}}"}';
 
                     // 解析 headers 为 JSON 字符串
@@ -232,6 +235,7 @@ export default function NotificationChannels() {
                 config: {
                     url: formValues.webhookUrl,
                     method: formValues.webhookMethod,
+                    contentType: formValues.webhookContentType,
                     body: formValues.webhookBody,
                     headers: Object.keys(headers).length > 0 ? headers : undefined,
                 },
@@ -646,6 +650,19 @@ export default function NotificationChannels() {
                                         <SelectItem value="DELETE">DELETE</SelectItem>
                                     </SelectContent>
                                 </Select>
+                            </div>
+
+                            <div>
+                                <label
+                                    className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+                                    请求类型 <span className="text-red-500">*</span>
+                                </label>
+                                <Input
+                                    value={formValues.webhookContentType || 'application/json; charset=utf-8'}
+                                    onChange={(e) => updateField('webhookContentType', e.target.value)}
+                                    placeholder="application/json; charset=utf-8"
+                                    className="bg-gray-50 border-gray-200 focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono text-sm"
+                                />
                             </div>
 
                             <div>

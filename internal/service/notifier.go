@@ -259,7 +259,7 @@ func (n *Notifier) sendCustomWebhook(ctx context.Context, config map[string]inte
 	})
 	n.logger.Sugar().Debugf("自定义Webhook请求体: %s", bodyStr)
 	var reqBody = strings.NewReader(bodyStr)
-	var contentType = "text/plain"
+	var contentType = config["contentType"].(string)
 
 	// 创建请求
 	req, err := http.NewRequestWithContext(ctx, method, webhookURL, reqBody)

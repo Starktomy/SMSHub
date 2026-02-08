@@ -38,6 +38,9 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           make build-web
+          echo "=== 检查 web/dist 目录 ==="
+          ls -la web/dist/
+          ls -la web/dist/assets/ || true
           make build-servers VERSION=${VERSION}
           ls -lh bin/
 

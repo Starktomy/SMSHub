@@ -1,8 +1,8 @@
 services:
-  uart_sms_forwarder:
-    # 使用最新的镜像，也可以指定具体版本如：dushixiang/uart_sms_forwarder:v1.0.0
-    image: dushixiang/uart_sms_forwarder:latest
-    container_name: uart_sms_forwarder
+  smshub:
+    # 使用最新的镜像，也可以指定具体版本如：starktomy/smshub:v1.1.0
+    image: starktomy/smshub:latest
+    container_name: smshub
     restart: unless-stopped
 
     ports:
@@ -17,9 +17,19 @@ services:
       # 挂载配置文件（首次运行前需要创建此文件）
       - ./config.yaml:/app/config.yaml
 
-    # 如果需要访问串口设备，取消以下注释并修改设备路径，每个人设备类型不同，USB 设备路径可能不同，建议根据实际情况修改，/dev/ttyUSB0 只是示例
+    # 串口设备映射（多设备支持）
+    # 根据实际连接的设备数量和路径修改，以下为示例：
     # devices:
-    #   - /dev/ttyUSB0:/dev/ttyUSB0
+    #   - /dev/ttyUSB0:/dev/ttyUSB0  # 设备1
+    #   - /dev/ttyUSB1:/dev/ttyUSB1  # 设备2
+    #   - /dev/ttyUSB2:/dev/ttyUSB2  # 设备3
+    #   - /dev/ttyACM0:/dev/ttyACM0  # 设备4（部分设备使用 ttyACM）
+    #
+    # 或者映射整个 USB 串口目录（不推荐，权限较大）：
+    # devices:
+    #   - /dev:/dev
+    #
+    # 提示：使用 ls /dev/ttyUSB* /dev/ttyACM* 查看可用串口
 
     environment:
       - TZ=Asia/Shanghai

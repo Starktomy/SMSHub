@@ -6,14 +6,14 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dushixiang/uart_sms_forwarder/config"
-	"github.com/dushixiang/uart_sms_forwarder/internal/handler"
-	"github.com/dushixiang/uart_sms_forwarder/internal/middleware"
-	"github.com/dushixiang/uart_sms_forwarder/internal/models"
-	"github.com/dushixiang/uart_sms_forwarder/internal/repo"
-	"github.com/dushixiang/uart_sms_forwarder/internal/service"
-	"github.com/dushixiang/uart_sms_forwarder/internal/version"
-	"github.com/dushixiang/uart_sms_forwarder/web"
+	"github.com/Starktomy/smshub/config"
+	"github.com/Starktomy/smshub/internal/handler"
+	"github.com/Starktomy/smshub/internal/middleware"
+	"github.com/Starktomy/smshub/internal/models"
+	"github.com/Starktomy/smshub/internal/repo"
+	"github.com/Starktomy/smshub/internal/service"
+	"github.com/Starktomy/smshub/internal/version"
+	"github.com/Starktomy/smshub/web"
 	"github.com/go-orz/orz"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -29,6 +29,7 @@ type Handlers struct {
 	TextMessage   *handler.TextMessageHandler
 	Serial        *handler.SerialHandler
 	ScheduledTask *handler.ScheduledTaskHandler
+	Device        *handler.DeviceHandler
 }
 
 func Run(configPath string) {
@@ -63,6 +64,7 @@ func setup(app *orz.App) error {
 
 	// 4. 初始化 Repository
 	textMessageRepo := repo.NewTextMessageRepo(db)
+	deviceRepo := repo.NewDeviceRepo(db)
 
 	// 5. 初始化 Service
 	propertyService := service.NewPropertyService(logger, db)
@@ -75,7 +77,16 @@ func setup(app *orz.App) error {
 		logger.Error("初始化默认配置失败", zap.Error(err))
 	}
 
-	// 6. 初始化串口服务
+	// 6. 初始化设备管理器
+	deviceManager := service.NewDeviceManager(
+		logger,
+		deviceRepo,
+		textMessageService,
+		notifier,
+		propertyService,
+	)
+
+	// 7. 初始化串口服务（兼容单设备模式）
 	serialService := service.NewSerialService(
 		logger,
 		appConfig.Serial,
@@ -84,24 +95,27 @@ func setup(app *orz.App) error {
 		propertyService,
 	)
 
-	// 7. 初始化定时任务服务
+	// 8. 初始化定时任务服务
 	schedulerService := service.NewSchedulerService(
 		logger,
 		db,
 		serialService,
+		deviceManager,
 	)
 	serialService.SetScheduledTaskStatusUpdater(schedulerService.UpdateLastRunStatusByMsgId)
+	deviceManager.SetScheduledTaskStatusUpdater(schedulerService.UpdateLastRunStatusByMsgId)
 
-	// 8. 初始化 OIDC 和 Account Service
+	// 9. 初始化 OIDC 和 Account Service
 	oidcService := service.NewOIDCService(logger, &appConfig)
 	accountService := service.NewAccountService(logger, oidcService, &appConfig)
 
-	// 9. 初始化 Handler
+	// 10. 初始化 Handler
 	authHandler := handler.NewAuthHandler(logger, accountService)
 	propertyHandler := handler.NewPropertyHandler(logger, propertyService, notifier)
 	textMessageHandler := handler.NewTextMessageHandler(logger, textMessageService, textMessageRepo)
 	serialHandler := handler.NewSerialHandler(logger, serialService)
 	scheduledTaskHandler := handler.NewScheduledTaskHandler(logger, schedulerService)
+	deviceHandler := handler.NewDeviceHandler(logger, deviceManager)
 
 	handlers := &Handlers{
 		Auth:          authHandler,
@@ -109,15 +123,26 @@ func setup(app *orz.App) error {
 		TextMessage:   textMessageHandler,
 		Serial:        serialHandler,
 		ScheduledTask: scheduledTaskHandler,
+		Device:        deviceHandler,
 	}
 
-	// 10. 设置 API 路由
+	// 11. 设置 API 路由
 	setupApi(app, handlers, &appConfig, logger)
 
-	// 11. 启动后台服务
+	// 12. 启动后台服务
 	background := context.Background()
-	// 启动串口服务
-	go serialService.Start()
+
+	// 启动设备管理器
+	if err := deviceManager.Start(background); err != nil {
+		logger.Error("启动设备管理器失败", zap.Error(err))
+	} else {
+		logger.Info("设备管理器启动成功")
+	}
+
+	// 启动串口服务（单设备兼容模式，如果配置了串口）
+	if appConfig.Serial.Port != "" {
+		go serialService.Start()
+	}
 
 	// 启动定时任务服务
 	if err := schedulerService.Start(background); err != nil {
@@ -148,6 +173,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.Property{},
 		&models.TextMessage{},
 		&models.ScheduledTask{},
+		&models.Device{},
 	)
 }
 
@@ -216,6 +242,26 @@ func setupApi(app *orz.App, handlers *Handlers, appConfig *config.AppConfig, log
 	api.PUT("/scheduled-tasks/:id", handlers.ScheduledTask.Update)
 	api.DELETE("/scheduled-tasks/:id", handlers.ScheduledTask.Delete)
 	api.POST("/scheduled-tasks/:id/trigger", handlers.ScheduledTask.Trigger)
+
+	// Device API
+	api.GET("/devices", handlers.Device.List)
+	api.GET("/devices/discover", handlers.Device.Discover)
+	api.GET("/devices/groups", handlers.Device.GetGroups)
+	api.GET("/devices/stats", handlers.Device.GetStats)
+	api.POST("/devices", handlers.Device.Create)
+	api.GET("/devices/:id", handlers.Device.Get)
+	api.PUT("/devices/:id", handlers.Device.Update)
+	api.DELETE("/devices/:id", handlers.Device.Delete)
+	api.POST("/devices/:id/enable", handlers.Device.Enable)
+	api.POST("/devices/:id/disable", handlers.Device.Disable)
+	api.POST("/devices/:id/flymode", handlers.Device.SetFlymode)
+	api.POST("/devices/:id/reboot", handlers.Device.Reboot)
+	api.GET("/devices/:id/status", handlers.Device.GetStatus)
+	api.POST("/devices/:id/sms", handlers.Device.SendSMS)
+
+	// SMS API (enhanced)
+	api.POST("/sms/send", handlers.Device.AutoSendSMS)
+	api.POST("/sms/batch", handlers.Device.BatchSendSMS)
 
 	// 健康检查接口（无需认证）
 	e.GET("/health", func(c echo.Context) error {

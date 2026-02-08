@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dushixiang/uart_sms_forwarder/internal/models"
-	"github.com/dushixiang/uart_sms_forwarder/internal/service"
+	"github.com/Starktomy/smshub/internal/models"
+	"github.com/Starktomy/smshub/internal/service"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )

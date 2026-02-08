@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dushixiang/uart_sms_forwarder/internal/models"
+	"github.com/Starktomy/smshub/internal/models"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -49,13 +49,15 @@ func (s *SerialService) handleIncomingSMS(msg *ParsedMessage) {
 	// 保存短信记录
 	ctx := context.Background()
 	record := &models.TextMessage{
-		ID:        uuid.NewString(),
-		From:      sms.From,
-		To:        "", // 接收方是本机
-		Content:   sms.Content,
-		Type:      models.MessageTypeIncoming,
-		Status:    models.MessageStatusReceived,
-		CreatedAt: time.Now().UnixMilli(),
+		ID:         uuid.NewString(),
+		From:       sms.From,
+		To:         "", // 接收方是本机
+		Content:    sms.Content,
+		Type:       models.MessageTypeIncoming,
+		Status:     models.MessageStatusReceived,
+		DeviceID:   s.deviceID,
+		DeviceName: s.deviceName,
+		CreatedAt:  time.Now().UnixMilli(),
 	}
 
 	if err := s.textMsgService.Save(ctx, record); err != nil {

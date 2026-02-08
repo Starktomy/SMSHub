@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dushixiang/uart_sms_forwarder/internal/models"
-	"github.com/dushixiang/uart_sms_forwarder/internal/repo"
+	"github.com/Starktomy/smshub/internal/models"
+	"github.com/Starktomy/smshub/internal/repo"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"

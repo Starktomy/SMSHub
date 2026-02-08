@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dushixiang/uart_sms_forwarder/internal/models"
-	"github.com/dushixiang/uart_sms_forwarder/internal/repo"
+	"github.com/Starktomy/smshub/internal/models"
+	"github.com/Starktomy/smshub/internal/repo"
 	"github.com/go-orz/orz"
 
 	"github.com/google/uuid"
@@ -21,6 +21,7 @@ type SchedulerService struct {
 	cron          *cron.Cron
 	repo          *repo.ScheduledTaskRepo
 	serialService *SerialService
+	deviceManager *DeviceManager
 }
 
 // NewSchedulerService 创建定时任务服务实例
@@ -28,11 +29,13 @@ func NewSchedulerService(
 	logger *zap.Logger,
 	db *gorm.DB,
 	serialService *SerialService,
+	deviceManager *DeviceManager,
 ) *SchedulerService {
 	return &SchedulerService{
 		logger:        logger,
 		repo:          repo.NewScheduledTaskRepo(db),
 		serialService: serialService,
+		deviceManager: deviceManager,
 	}
 }
 
@@ -184,27 +187,41 @@ func (s *SchedulerService) executeTask(task models.ScheduledTask) error {
 		zap.String("id", task.ID),
 		zap.String("name", task.Name),
 		zap.String("phone", task.PhoneNumber),
-		zap.String("content", task.Content))
+		zap.String("content", task.Content),
+		zap.String("deviceId", task.DeviceID))
 
 	ctx := context.Background()
 
-	flyMode := s.serialService.FlyMode()
-	// 如果是飞行模式，取消飞行模式，再等待 30 秒后发送短信
-	if flyMode {
-		s.logger.Info("当前为飞行模式，取消飞行模式后等待 30 秒")
-		// 取消飞行模式
-		if err := s.serialService.SetFlymode(false); err != nil {
-			s.logger.Error("取消飞行模式失败", zap.Error(err))
-			return err
+	var msgId string
+	var err error
+
+	// 如果指定了设备ID，使用设备管理器发送
+	if task.DeviceID != "" && s.deviceManager != nil {
+		msgId, err = s.deviceManager.SendSMSByDevice(task.DeviceID, task.PhoneNumber, task.Content)
+	} else if s.deviceManager != nil && s.deviceManager.GetOnlineDeviceCount() > 0 {
+		// 使用设备管理器自动选择设备发送
+		msgId, _, err = s.deviceManager.SendSMS(task.PhoneNumber, task.Content, StrategyAuto)
+	} else {
+		// 回退到单设备模式
+		flyMode := s.serialService.FlyMode()
+		// 如果是飞行模式，取消飞行模式，再等待 30 秒后发送短信
+		if flyMode {
+			s.logger.Info("当前为飞行模式，取消飞行模式后等待 30 秒")
+			// 取消飞行模式
+			if err := s.serialService.SetFlymode(false); err != nil {
+				s.logger.Error("取消飞行模式失败", zap.Error(err))
+				return err
+			}
+			s.logger.Info("取消飞行模式成功")
+			// 等待 30 秒
+			time.Sleep(30 * time.Second)
+			s.logger.Info("等待 30 秒后发送短信")
 		}
-		s.logger.Info("取消飞行模式成功")
-		// 等待 30 秒
-		time.Sleep(30 * time.Second)
-		s.logger.Info("等待 30 秒后发送短信")
+
+		// 发送短信
+		msgId, err = s.serialService.SendSMS(task.PhoneNumber, task.Content)
 	}
 
-	// 发送短信
-	msgId, err := s.serialService.SendSMS(task.PhoneNumber, task.Content)
 	if err != nil {
 		s.logger.Error("定时任务发送短信失败",
 			zap.String("id", task.ID),
@@ -213,12 +230,12 @@ func (s *SchedulerService) executeTask(task models.ScheduledTask) error {
 		_ = s.UpdateLastRun(ctx, task.ID, msgId, models.LastRunStatusFailed)
 		return err
 	}
+
 	s.logger.Info("定时任务执行成功",
 		zap.String("id", task.ID),
 		zap.String("name", task.Name))
 
 	// 更新任务的 LastRunAt 字段到数据库
-
 	_ = s.UpdateLastRun(ctx, task.ID, msgId, models.LastRunStatusUnknown)
 
 	return nil

@@ -59,14 +59,14 @@ jobs:
 
           # 为每个平台创建发布包
           for PLATFORM in "${PLATFORMS[@]}"; do
-            RELEASE_DIR="uart_sms_forwarder-${PLATFORM}"
+            RELEASE_DIR="smshub-${PLATFORM}"
             mkdir -p ${RELEASE_DIR}
 
             # 复制二进制文件
             if [[ $PLATFORM == windows-* ]]; then
-              cp bin/uart_sms_forwarder-${PLATFORM}.exe ${RELEASE_DIR}/uart_sms_forwarder.exe
+              cp bin/smshub-${PLATFORM}.exe ${RELEASE_DIR}/smshub.exe
             else
-              cp bin/uart_sms_forwarder-${PLATFORM} ${RELEASE_DIR}/uart_sms_forwarder
+              cp bin/smshub-${PLATFORM} ${RELEASE_DIR}/smshub
             fi
 
             # 复制配置文件示例
@@ -79,13 +79,13 @@ jobs:
           done
 
           # 显示所有打包结果
-          ls -lh uart_sms_forwarder-*.tar.gz
+          ls -lh smshub-*.tar.gz
 
       - name: 创建 Release 并上传文件
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            uart_sms_forwarder-*.tar.gz
+            smshub-*.tar.gz
           draft: false
           prerelease: false
           generate_release_notes: true

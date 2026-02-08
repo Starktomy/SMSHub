@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/dushixiang/uart_sms_forwarder/config"
+	"github.com/Starktomy/smshub/config"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 )

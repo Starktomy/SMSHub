@@ -14,11 +14,11 @@ WORKDIR /app
 ARG TARGETARCH
 
 # 从外部编译的产物复制文件
-COPY ./bin/uart_sms_forwarder-linux-${TARGETARCH} ./uart_sms_forwarder
+COPY ./bin/smshub-linux-${TARGETARCH} ./smshub
 
 # 创建必要的目录
 RUN mkdir -p /app/data /app/logs && \
-    chmod +x /app/uart_sms_forwarder
+    chmod +x /app/smshub
 
 # 设置数据卷
 VOLUME ["/app/data"]
@@ -27,4 +27,4 @@ VOLUME ["/app/data"]
 EXPOSE 8080
 
 # 启动服务
-ENTRYPOINT ["./uart_sms_forwarder"]
+ENTRYPOINT ["./smshub"]

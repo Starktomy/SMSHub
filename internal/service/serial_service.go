@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dushixiang/uart_sms_forwarder/config"
-	"github.com/dushixiang/uart_sms_forwarder/internal/models"
+	"github.com/Starktomy/smshub/config"
+	"github.com/Starktomy/smshub/internal/models"
 	"github.com/go-orz/cache"
 	"github.com/google/uuid"
 	"github.com/jpillora/backoff"
@@ -32,6 +32,9 @@ const (
 
 type ScheduledTaskStatusUpdater func(ctx context.Context, msgID string, status models.LastRunStatus) error
 
+// StatusUpdateCallback 状态更新回调
+type StatusUpdateCallback func(status *StatusData)
+
 // SerialService 串口管理服务
 type SerialService struct {
 	logger                     *zap.Logger
@@ -42,6 +45,7 @@ type SerialService struct {
 	propertyService            *PropertyService
 	handlers                   map[string]messageHandler
 	scheduledTaskStatusUpdater ScheduledTaskStatusUpdater
+	statusUpdateCallback       StatusUpdateCallback
 	wg                         sync.WaitGroup
 	// 设备信息缓存
 	deviceCache cache.Cache[string, *StatusData]
@@ -52,6 +56,15 @@ type SerialService struct {
 
 	// 设备的飞行模式查询永远返回 false，无奈只能在应用层处理
 	flyMode atomic.Bool
+
+	// 多设备支持
+	deviceID   string // 设备ID
+	deviceName string // 设备名称
+
+	// 停止控制
+	stopCh     chan struct{}
+	stopOnce   sync.Once
+	connCancel context.CancelFunc
 }
 
 // NewSerialService 创建串口服务实例
@@ -69,9 +82,40 @@ func NewSerialService(
 		notifier:        notifier,
 		propertyService: propertyService,
 		deviceCache:     cache.New[string, *StatusData](CacheTTL),
+		stopCh:          make(chan struct{}),
 	}
 	service.initMessageHandlers()
 	return service
+}
+
+// NewSerialServiceWithDeviceID 创建带设备ID的串口服务实例（多设备模式）
+func NewSerialServiceWithDeviceID(
+	logger *zap.Logger,
+	serialPort string,
+	deviceID string,
+	deviceName string,
+	textMsgService *TextMessageService,
+	notifier *Notifier,
+	propertyService *PropertyService,
+) *SerialService {
+	service := &SerialService{
+		logger:          logger,
+		config:          config.SerialConfig{Port: serialPort},
+		textMsgService:  textMsgService,
+		notifier:        notifier,
+		propertyService: propertyService,
+		deviceCache:     cache.New[string, *StatusData](CacheTTL),
+		deviceID:        deviceID,
+		deviceName:      deviceName,
+		stopCh:          make(chan struct{}),
+	}
+	service.initMessageHandlers()
+	return service
+}
+
+// SetStatusUpdateCallback 设置状态更新回调
+func (s *SerialService) SetStatusUpdateCallback(callback StatusUpdateCallback) {
+	s.statusUpdateCallback = callback
 }
 
 func (s *SerialService) SetScheduledTaskStatusUpdater(updater ScheduledTaskStatusUpdater) {
@@ -90,6 +134,13 @@ func (s *SerialService) Start() {
 	}
 
 	for {
+		select {
+		case <-s.stopCh:
+			s.logger.Info("串口服务停止")
+			return
+		default:
+		}
+
 		err := s.runOnce(b.Reset)
 
 		// 连接失败或断开，使用 backoff 重试
@@ -101,9 +152,33 @@ func (s *SerialService) Start() {
 				zap.Duration("retry_after", retryAfter))
 			s.deviceCache.Delete(CacheKeyDeviceStatus)
 
-			time.Sleep(retryAfter)
+			select {
+			case <-s.stopCh:
+				return
+			case <-time.After(retryAfter):
+			}
 		}
 	}
+}
+
+// Stop 停止串口服务
+func (s *SerialService) Stop() {
+	s.stopOnce.Do(func() {
+		close(s.stopCh)
+		if s.connCancel != nil {
+			s.connCancel()
+		}
+	})
+}
+
+// GetDeviceID 获取设备ID
+func (s *SerialService) GetDeviceID() string {
+	return s.deviceID
+}
+
+// GetDeviceName 获取设备名称
+func (s *SerialService) GetDeviceName() string {
+	return s.deviceName
 }
 
 // setConnected 设置连接状态
@@ -129,6 +204,13 @@ func (s *SerialService) getConnectionInfo() (portName string, connected bool) {
 
 // runOnce 执行一次连接尝试
 func (s *SerialService) runOnce(resetBackoff func()) error {
+	// 检查是否已停止
+	select {
+	case <-s.stopCh:
+		return nil
+	default:
+	}
+
 	// 获取串口列表
 	ports, err := serial.GetPortsList()
 	if err != nil {
@@ -173,6 +255,7 @@ func (s *SerialService) runOnce(resetBackoff func()) error {
 
 	// 为本次连接创建独立的 context，用于管理连接的生命周期
 	connCtx, connCancel := context.WithCancel(context.Background())
+	s.connCancel = connCancel
 	defer connCancel() // 确保退出时取消 context
 
 	// 启动监听 goroutine
@@ -368,13 +451,15 @@ func (s *SerialService) SendSMS(to, content string) (string, error) {
 	ctx := context.Background()
 	msgID := uuid.NewString()
 	msg := &models.TextMessage{
-		ID:        msgID,
-		From:      "", // 发送方是本机
-		To:        to,
-		Content:   content,
-		Type:      models.MessageTypeOutgoing,
-		Status:    models.MessageStatusSending, // 初始状态为发送中
-		CreatedAt: time.Now().UnixMilli(),
+		ID:         msgID,
+		From:       "", // 发送方是本机
+		To:         to,
+		Content:    content,
+		Type:       models.MessageTypeOutgoing,
+		Status:     models.MessageStatusSending, // 初始状态为发送中
+		DeviceID:   s.deviceID,
+		DeviceName: s.deviceName,
+		CreatedAt:  time.Now().UnixMilli(),
 	}
 
 	if err := s.textMsgService.Save(ctx, msg); err != nil {

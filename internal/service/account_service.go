@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/dushixiang/uart_sms_forwarder/config"
+	"github.com/Starktomy/smshub/config"
 	"github.com/go-errors/errors"
 	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"

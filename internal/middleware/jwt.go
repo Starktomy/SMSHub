@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dushixiang/uart_sms_forwarder/internal/util"
+	"github.com/Starktomy/smshub/internal/util"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )

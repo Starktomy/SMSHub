@@ -1,5 +1,5 @@
 import {Link, Outlet, useLocation, useNavigate} from 'react-router-dom';
-import {Bell, Clock, LayoutDashboard, LogOut, MessageSquare, Smartphone} from 'lucide-react';
+import {Bell, Clock, LayoutDashboard, LogOut, MessageSquare, Smartphone, Send, Router} from 'lucide-react';
 import {Button} from "@/components/ui/button.tsx";
 import {useQuery} from "@tanstack/react-query";
 import {getVersion} from "@/api/property.ts";
@@ -15,7 +15,9 @@ export default function Layout() {
     const navigation = [
         {name: '统计面板', href: '/', icon: LayoutDashboard},
         {name: '短信记录', href: '/messages', icon: MessageSquare},
+        {name: '设备管理', href: '/devices', icon: Router},
         {name: '串口控制', href: '/serial', icon: Smartphone},
+        {name: '批量发送', href: '/batch-send', icon: Send},
         {name: '通知渠道', href: '/notifications', icon: Bell},
         {name: '计划任务', href: '/scheduled-tasks', icon: Clock},
     ];
@@ -84,10 +86,10 @@ export default function Layout() {
                         <div className="flex items-center space-x-4 lg:space-x-8">
                             {/* Logo */}
                             <div className="flex items-center space-x-2 lg:space-x-3 flex-shrink-0">
-                                <img src={'/logo.png'} alt="UART 短信转发器" className="w-6 h-6"/>
+                                <img src={'/logo.png'} alt="SMSHub" className="w-6 h-6"/>
                                 <div className="hidden sm:flex flex-col">
                                     <h1 className="text-base lg:text-lg font-bold leading-tight bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                                        UART 短信转发器
+                                        SMSHub
                                     </h1>
                                 </div>
                             </div>
@@ -196,7 +198,7 @@ export default function Layout() {
             <footer className="bg-white/80 backdrop-blur-sm border-t border-gray-200 mt-auto">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="text-center text-xs text-gray-500">
-                        <p>UART 短信转发器 © 2025 版权所有 dushixiang · 版本 {versionQuery.data?.version}</p>
+                        <p>SMSHub © 2025 · 版本 {versionQuery.data?.version}</p>
                     </div>
                 </div>
             </footer>

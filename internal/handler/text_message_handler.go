@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/dushixiang/uart_sms_forwarder/internal/repo"
-	"github.com/dushixiang/uart_sms_forwarder/internal/service"
+	"github.com/Starktomy/smshub/internal/repo"
+	"github.com/Starktomy/smshub/internal/service"
 
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"

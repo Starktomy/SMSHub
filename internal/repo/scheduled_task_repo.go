@@ -3,7 +3,7 @@ package repo
 import (
 	"context"
 
-	"github.com/dushixiang/uart_sms_forwarder/internal/models"
+	"github.com/Starktomy/smshub/internal/models"
 	"github.com/go-orz/orz"
 	"gorm.io/gorm"
 )

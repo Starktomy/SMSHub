@@ -9,6 +9,8 @@ import Messages from './pages/Messages';
 import SerialControl from './pages/SerialControl';
 import NotificationChannels from './pages/NotificationChannels';
 import ScheduledTasksConfig from './pages/ScheduledTasksConfig';
+import Devices from './pages/Devices';
+import BatchSend from './pages/BatchSend';
 import {Toaster} from "@/components/ui/sonner.tsx";
 
 function App() {
@@ -31,7 +33,9 @@ function App() {
                     >
                         <Route index element={<Dashboard/>}/>
                         <Route path="messages" element={<Messages/>}/>
+                        <Route path="devices" element={<Devices/>}/>
                         <Route path="serial" element={<SerialControl/>}/>
+                        <Route path="batch-send" element={<BatchSend/>}/>
                         <Route path="notifications" element={<NotificationChannels/>}/>
                         <Route path="scheduled-tasks" element={<ScheduledTasksConfig/>}/>
                     </Route>

@@ -1,14 +1,22 @@
 -- =================================================================================
 -- PROJECT: UART SMS Forwarder
 -- DEVICE:  Air780EHV
--- VERSION: 1.0.1
+-- VERSION: 1.1.0
 -- 协议说明：
 --   上行（MCU -> 模块）：CMD_START:{json}:CMD_END
 --   下行（模块 -> MCU）：SMS_START:{json}:SMS_END
 -- =================================================================================
 
-PROJECT = "uart_sms_forwarder"
-VERSION = "1.0.3"
+PROJECT = "smshub"
+VERSION = "1.1.0"
+
+-- 配置参数
+local CONFIG = {
+    HEARTBEAT_INTERVAL = 60000,  -- 心跳间隔（毫秒）
+    SMS_SEND_TIMEOUT = 30000,    -- 短信发送超时（毫秒）
+    MAX_BUFFER_SIZE = 50,        -- 消息缓冲区大小
+    UART_BUFFER_MAX = 4096,      -- UART接收缓冲区最大值
+}
 
 log.info("main", PROJECT, VERSION)
 
@@ -18,7 +26,6 @@ sys = require("sys")
 -- 2. 全局配置与变量
 -- [注意] 如果接单片机物理引脚，通常是 uart.UART_1；如果是USB调试，用 uart.VUART_0
 local uartid = uart.VUART_0
-local max_buffer_size = 50
 local msg_buffer = {}
 local uart_recv_buffer = ""
 local call_ring_count = 0  -- 来电响铃计数
@@ -47,6 +54,7 @@ function get_mobile_info()
     info.sim_ready = (iccid ~= nil and iccid ~= "" and iccid ~= "unknown")
     info.iccid = iccid or "unknown"
     info.imsi = mobile.imsi() or "unknown"
+    info.imei = mobile.imei() or "unknown"  -- 设备唯一标识
     info.number = mobile.number(0) or ""  -- 获取手机号，可能为空
 
     -- 获取信号强度指标
@@ -99,13 +107,17 @@ function process_uart_command(cmd_data)
         local request_id = cmd_data.request_id or os.time()
         local to = cmd_data.to
         local content = cmd_data.content
-        -- 在协程中同步发送短信
+        -- 在协程中同步发送短信（带超时）
         sys.taskInit(function()
             log.info("CMD", "发送短信 ->", to)
-            local result = sms.sendLong(to, content).wait()
+            local result = sms.sendLong(to, content).wait(CONFIG.SMS_SEND_TIMEOUT)
+            local success = (result == true)
+            if not success then
+                log.warn("CMD", "短信发送失败或超时", to)
+            end
             send_to_uart({
                 type = "sms_send_result",
-                success = result == true,
+                success = success,
                 request_id = request_id,
                 to = to,
                 timestamp = os.time()
@@ -117,7 +129,6 @@ function process_uart_command(cmd_data)
             type = "status_response",
             timestamp = os.time(),
             mem_kb = math.floor(collectgarbage("count")),
-            cellular_enabled = cellular_enabled,
             version = VERSION,
             mobile = get_mobile_info()
         })
@@ -171,7 +182,7 @@ sys.subscribe("SMS_INC", function(phone, content)
         content = content
     }
     table.insert(msg_buffer, msg)
-    if #msg_buffer > max_buffer_size then
+    if #msg_buffer > CONFIG.MAX_BUFFER_SIZE then
         table.remove(msg_buffer, 1) -- 移除旧的
     end
     sys.publish("NEW_MSG_IN_BUFFER")
@@ -255,7 +266,7 @@ uart.on(uartid, "receive", function(id, len)
     end
 
     -- 溢出保护：如果缓冲区过大且找不到有效包，清空
-    if #uart_recv_buffer > 4096 then
+    if #uart_recv_buffer > CONFIG.UART_BUFFER_MAX then
         log.error("UART", "Buffer Overflow - 清空缓冲区")
         uart_recv_buffer = ""
         send_to_uart({type="error", msg="Buffer overflow, cleared"})
@@ -282,17 +293,20 @@ end)
 
 sys.taskInit(function()
     sys.wait(5000)
+    local info = get_mobile_info()
     send_to_uart({
         type = "system_ready",
         project = PROJECT,
         version = VERSION,
+        imei = info.imei,
         data_disabled = true
     })
     while true do
-        sys.wait(60000)
-        local info = get_mobile_info()
+        sys.wait(CONFIG.HEARTBEAT_INTERVAL)
+        info = get_mobile_info()
         send_to_uart({
             type = "heartbeat",
+            imei = info.imei,
             rssi = info.rssi,
             signal_level = info.signal_level,
             signal_desc = info.signal_desc,

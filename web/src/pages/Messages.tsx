@@ -1,8 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
-import {MoreVertical, RefreshCw, Search, Send, Trash2, User, X} from 'lucide-react';
+import {MoreVertical, RefreshCw, Search, Send, Trash2, User, X, Router} from 'lucide-react';
 import {toast} from 'sonner';
 import {clearMessages, getConversations, getConversationMessages, deleteConversation, deleteMessage} from '../api/messages';
-import {sendSMS} from '../api/serial';
 import {Input} from '@/components/ui/input';
 import {Button} from '@/components/ui/button';
 import {
@@ -11,8 +10,17 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import type {Conversation, TextMessage} from '@/api/types';
+import {devicesApi} from '@/api/devices';
+import type {Device} from '@/api/devices';
 
 export default function Messages() {
     const queryClient = useQueryClient();
@@ -24,6 +32,19 @@ export default function Messages() {
     const [inputText, setInputText] = useState('');
     // 搜索关键词
     const [searchQuery, setSearchQuery] = useState('');
+    // 设备筛选
+    const [deviceFilter, setDeviceFilter] = useState('all');
+    // 发送设备选择
+    const [sendDeviceId, setSendDeviceId] = useState('auto');
+
+    // 获取设备列表
+    const {data: devices = []} = useQuery<Device[]>({
+        queryKey: ['devices'],
+        queryFn: devicesApi.list,
+        refetchInterval: 10000,
+    });
+
+    const onlineDevices = devices.filter(d => d.status === 'online');
 
     // 根据手机号生成头像颜色
     const getAvatarColor = (phoneNumber: string) => {
@@ -60,9 +81,14 @@ export default function Messages() {
         refetchInterval: 5000,
     });
 
-    // 发送短信 Mutation
+    // 发送短信 Mutation - 支持选择设备
     const sendSMSMutation = useMutation({
-        mutationFn: (data: { to: string; content: string }) => sendSMS(data),
+        mutationFn: (data: { to: string; content: string; deviceId?: string }) => {
+            if (data.deviceId && data.deviceId !== 'auto') {
+                return devicesApi.sendSMS(data.deviceId, data.to, data.content);
+            }
+            return devicesApi.autoSendSMS(data.to, data.content);
+        },
         onSuccess: () => {
             setInputText('');
             // 刷新会话列表和当前会话消息
@@ -136,11 +162,24 @@ export default function Messages() {
     // 获取当前选中的会话信息
     const activeConversation = conversations.find(c => c.peer === selectedPeer);
 
-    // 过滤会话列表
-    const filteredConversations = conversations.filter(conv =>
-        conv.peer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        conv.lastMessage.content.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // 过滤会话列表（支持设备筛选）
+    const filteredConversations = conversations.filter(conv => {
+        // 搜索过滤
+        const matchesSearch = conv.peer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            conv.lastMessage.content.toLowerCase().includes(searchQuery.toLowerCase());
+
+        // 设备过滤
+        const matchesDevice = deviceFilter === 'all' ||
+            conv.lastMessage.deviceId === deviceFilter;
+
+        return matchesSearch && matchesDevice;
+    });
+
+    // 按设备过滤当前消息
+    const filteredMessages = currentMessages.filter(msg => {
+        if (deviceFilter === 'all') return true;
+        return msg.deviceId === deviceFilter;
+    });
 
     const handleSendSMS = (e: React.FormEvent) => {
         e.preventDefault();
@@ -148,7 +187,11 @@ export default function Messages() {
             toast.warning('请输入短信内容');
             return;
         }
-        sendSMSMutation.mutate({to: selectedPeer, content: inputText});
+        sendSMSMutation.mutate({
+            to: selectedPeer,
+            content: inputText,
+            deviceId: sendDeviceId !== 'auto' ? sendDeviceId : undefined
+        });
     };
 
     const handleClear = () => {
@@ -200,6 +243,13 @@ export default function Messages() {
         }
     };
 
+    // 获取设备名称
+    const getDeviceName = (deviceId?: string) => {
+        if (!deviceId) return '';
+        const device = devices.find(d => d.id === deviceId);
+        return device ? (device.name || device.serialPort) : deviceId;
+    };
+
     if (isLoading) {
         return (
             <div className="flex justify-center items-center h-[calc(100vh-12rem)]">
@@ -216,6 +266,21 @@ export default function Messages() {
                     消息中心
                 </h1>
                 <div className="flex gap-2">
+                    {/* 设备筛选 */}
+                    <Select value={deviceFilter} onValueChange={setDeviceFilter}>
+                        <SelectTrigger className="w-40">
+                            <Router className="w-4 h-4 mr-2" />
+                            <SelectValue placeholder="全部设备" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">全部设备</SelectItem>
+                            {devices.map((device) => (
+                                <SelectItem key={device.id} value={device.id}>
+                                    {device.name || device.serialPort}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                     <Button
                         onClick={() => refetch()}
                         variant="outline"
@@ -282,11 +347,18 @@ export default function Messages() {
                                                 className={`w-9 h-9 rounded-full bg-gradient-to-br ${getAvatarColor(conv.peer)} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
                                                 {conv.peer.slice(-2)}
                                             </div>
-                                            <span className={`text-sm font-semibold ${
-                                                selectedPeer === conv.peer ? 'text-gray-900' : 'text-gray-700'
-                                            }`}>
-                                                {conv.peer}
-                                            </span>
+                                            <div>
+                                                <span className={`text-sm font-semibold ${
+                                                    selectedPeer === conv.peer ? 'text-gray-900' : 'text-gray-700'
+                                                }`}>
+                                                    {conv.peer}
+                                                </span>
+                                                {conv.lastMessage.deviceId && (
+                                                    <div className="text-[10px] text-gray-400">
+                                                        {getDeviceName(conv.lastMessage.deviceId)}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                         <span className="text-xs text-gray-400">
                                             {formatTime(conv.lastMessage.createdAt)}
@@ -363,9 +435,9 @@ export default function Messages() {
 
                     {/* 消息列表 */}
                     <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                        {selectedPeer && currentMessages.length > 0 ? (
+                        {selectedPeer && filteredMessages.length > 0 ? (
                             <>
-                                {currentMessages.map((msg) => (
+                                {filteredMessages.map((msg) => (
                                     <div
                                         key={msg.id}
                                         className={`flex ${msg.type === 'outgoing' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-200 group`}
@@ -397,6 +469,11 @@ export default function Messages() {
                                                     {formatTime(msg.createdAt)}
                                                 </span>
                                                 {msg.type === 'outgoing' && getStatusBadge(msg.status)}
+                                                {msg.deviceId && (
+                                                    <span className="text-[10px] text-gray-400">
+                                                        • {getDeviceName(msg.deviceId)}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -414,6 +491,20 @@ export default function Messages() {
                     {/* 输入框 */}
                     <div className="p-4 bg-white border-t border-gray-200">
                         <form className="flex gap-3" onSubmit={handleSendSMS}>
+                            {/* 发送设备选择 */}
+                            <Select value={sendDeviceId} onValueChange={setSendDeviceId}>
+                                <SelectTrigger className="w-32">
+                                    <SelectValue placeholder="自动" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="auto">自动选择</SelectItem>
+                                    {onlineDevices.map((device) => (
+                                        <SelectItem key={device.id} value={device.id}>
+                                            {device.name || device.serialPort}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                             <Input
                                 type="text"
                                 value={inputText}

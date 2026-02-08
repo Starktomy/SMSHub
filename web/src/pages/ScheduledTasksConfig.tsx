@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {Calendar, Clock, Edit, MessageSquare, Phone, Plus, Play, Trash2, CheckCircle2, XCircle} from 'lucide-react';
+import {Calendar, Clock, Edit, MessageSquare, Phone, Plus, Play, Trash2, CheckCircle2, XCircle, Router} from 'lucide-react';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {toast} from 'sonner';
 import {Button} from '@/components/ui/button';
@@ -14,6 +14,13 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     createScheduledTask,
     deleteScheduledTask,
     getScheduledTasks,
@@ -22,6 +29,8 @@ import {
     triggerScheduledTask,
     updateScheduledTask,
 } from '../api/scheduled_task';
+import {devicesApi} from '@/api/devices';
+import type {Device} from '@/api/devices';
 
 interface TaskFormData {
     name: string;
@@ -29,6 +38,7 @@ interface TaskFormData {
     intervalDays: number;
     phoneNumber: string;
     content: string;
+    deviceId: string;
 }
 
 export default function ScheduledTasksConfig() {
@@ -41,7 +51,23 @@ export default function ScheduledTasksConfig() {
         intervalDays: 90,
         phoneNumber: '',
         content: '',
+        deviceId: 'auto',
     });
+
+    // 获取设备列表
+    const {data: devices = []} = useQuery<Device[]>({
+        queryKey: ['devices'],
+        queryFn: devicesApi.list,
+    });
+
+    const onlineDevices = devices.filter(d => d.status === 'online');
+
+    // 获取设备名称
+    const getDeviceName = (deviceId?: string) => {
+        if (!deviceId || deviceId === 'auto') return '自动选择';
+        const device = devices.find(d => d.id === deviceId);
+        return device ? (device.name || device.serialPort) : deviceId;
+    };
 
     // 获取状态显示信息
     const getStatusDisplay = (status?: LastRunStatus) => {
@@ -143,6 +169,7 @@ export default function ScheduledTasksConfig() {
             intervalDays: 90,
             phoneNumber: '',
             content: '',
+            deviceId: 'auto',
         });
     };
 
@@ -162,6 +189,7 @@ export default function ScheduledTasksConfig() {
             intervalDays: task.intervalDays,
             phoneNumber: task.phoneNumber,
             content: task.content,
+            deviceId: (task as any).deviceId || 'auto',
         });
         setDialogOpen(true);
     };
@@ -301,6 +329,17 @@ export default function ScheduledTasksConfig() {
                                                 className="text-xs text-gray-400 font-medium block mb-0.5">目标号码</span>
                                             <span
                                                 className="text-sm text-gray-700 font-mono font-semibold">{task.phoneNumber}</span>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        className="flex items-start space-x-2 bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                                        <Router size={14} className="text-gray-400 mt-0.5 flex-shrink-0"/>
+                                        <div className="flex-1 min-w-0">
+                                            <span
+                                                className="text-xs text-gray-400 font-medium block mb-0.5">发送设备</span>
+                                            <span
+                                                className="text-sm text-gray-700 font-semibold">{getDeviceName((task as any).deviceId)}</span>
                                         </div>
                                     </div>
 
@@ -471,6 +510,37 @@ export default function ScheduledTasksConfig() {
                                     接收短信的手机号码
                                 </p>
                             </div>
+                        </div>
+
+                        {/* 发送设备 */}
+                        <div>
+                            <label
+                                className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide flex items-center gap-1.5">
+                                <Router size={12} className="text-gray-400"/>
+                                发送设备
+                            </label>
+                            <Select value={formData.deviceId} onValueChange={(v) => updateFormField('deviceId', v)}>
+                                <SelectTrigger className="bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-500">
+                                    <SelectValue placeholder="自动选择" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="auto">自动选择</SelectItem>
+                                    {devices.map((device) => (
+                                        <SelectItem key={device.id} value={device.id}>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`w-2 h-2 rounded-full ${
+                                                    device.status === 'online' ? 'bg-green-500' : 'bg-gray-300'
+                                                }`} />
+                                                {device.name || device.serialPort}
+                                                {device.operator && ` (${device.operator})`}
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-gray-400 mt-1.5">
+                                选择发送短信的设备，自动选择将使用信号最好的在线设备
+                            </p>
                         </div>
 
                         {/* 短信内容 */}

@@ -9,6 +9,8 @@ export interface TextMessage {
     timestamp: number;
     createdAt: number;
     updatedAt: number;
+    deviceId?: string;      // 关联设备ID
+    deviceName?: string;    // 设备名称
 }
 
 // 查询结果

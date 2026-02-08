@@ -18,7 +18,7 @@ import {Send, CheckCircle, XCircle, Loader2} from 'lucide-react';
 export default function BatchSend() {
     const [recipients, setRecipients] = useState('');
     const [content, setContent] = useState('');
-    const [deviceId, setDeviceId] = useState('');
+    const [deviceId, setDeviceId] = useState('auto');
     const [strategy, setStrategy] = useState<'auto' | 'round_robin' | 'random' | 'signal_best'>('auto');
     const [results, setResults] = useState<BatchSendResult[]>([]);
 
@@ -68,7 +68,7 @@ export default function BatchSend() {
             strategy,
         };
 
-        if (deviceId) {
+        if (deviceId && deviceId !== 'auto') {
             request.deviceId = deviceId;
         }
 
@@ -132,10 +132,10 @@ export default function BatchSend() {
                                     <SelectValue placeholder="自动选择设备" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">自动选择</SelectItem>
+                                    <SelectItem value="auto">自动选择</SelectItem>
                                     {onlineDevices.map((device) => (
                                         <SelectItem key={device.id} value={device.id}>
-                                            {device.name || device.serialPort} ({device.operator})
+                                            {device.name || device.serialPort} {device.operator ? `(${device.operator})` : ''}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -143,7 +143,7 @@ export default function BatchSend() {
                         </div>
 
                         {/* 负载均衡策略 */}
-                        {!deviceId && (
+                        {deviceId === 'auto' && (
                             <div>
                                 <label className="text-sm font-medium">分配策略</label>
                                 <Select

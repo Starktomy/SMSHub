@@ -49,6 +49,9 @@ func (s *SerialService) handleStatusResponse(msg *ParsedMessage) {
 		}()
 	}
 	s.deviceCache.Set(CacheKeyDeviceStatus, &statusData, CacheTTL)
+	if s.statusUpdateCallback != nil {
+		s.statusUpdateCallback(&statusData)
+	}
 	s.logger.Debug("设备状态缓存已更新")
 }
 

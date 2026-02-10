@@ -1,14 +1,14 @@
 -- =================================================================================
 -- PROJECT: UART SMS Forwarder
 -- DEVICE:  Air780EHV
--- VERSION: 1.1.0
+-- VERSION: 1.2.0 (Dual UART + Optimization)
 -- 协议说明：
 --   上行（MCU -> 模块）：CMD_START:{json}:CMD_END
 --   下行（模块 -> MCU）：SMS_START:{json}:SMS_END
 -- =================================================================================
 
 PROJECT = "smshub"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 -- 配置参数
 local CONFIG = {
@@ -24,10 +24,24 @@ log.info("main", PROJECT, VERSION)
 sys = require("sys")
 
 -- 2. 全局配置与变量
--- [注意] 如果接单片机物理引脚，通常是 uart.UART_1；如果是USB调试，用 uart.VUART_0
-local uartid = uart.VUART_0
+-- 定义两个串口：USB虚拟串口 和 物理串口(Main UART)
+local uart_usb = uart.VUART_0 or 0  -- 默认USB是0，防止为nil
+local uart_phy = uart.UART_1 or 1   -- 默认物理口是1
+
+-- 为每个串口维护独立的接收缓冲区 (使用 table 优化内存)
+local uart_buffers = {}
+-- 初始化缓冲区，防止 key 为 nil 导致崩溃
+if uart_usb then uart_buffers[uart_usb] = {} end
+if uart_phy then uart_buffers[uart_phy] = {} end
+
+-- LED 控制
+-- 已移除 LED 控制逻辑
+
+
+-- 短信发送任务队列
+local sms_send_queue = {}
+
 local msg_buffer = {}
-local uart_recv_buffer = ""
 local call_ring_count = 0  -- 来电响铃计数
 
 -- ========== 关键：禁用自动数据连接 ==========
@@ -39,8 +53,10 @@ if wdt then
     sys.timerLoopStart(wdt.feed, 3000)
 end
 
-uart.setup(uartid, 115200, 8, 1)
-log.info("System", "UART 初始化成功")
+-- 初始化两个串口
+uart.setup(uart_usb, 115200, 8, 1)
+uart.setup(uart_phy, 115200, 8, 1)
+log.info("System", "双串口初始化成功 (USB & PHY)")
 
 -- =================================================================================
 -- 工具函数区
@@ -78,18 +94,19 @@ function get_mobile_info()
     info.uptime = mcu.ticks2() -- 单位为秒
 
     -- https://docs.openluat.com/osapi/core/mobile/#mobileflymodeindex-enable
-    -- 查询飞行模式状态
-    -- mobile.flymode() 返回当前飞行模式状态：true 表示飞行模式启用，false 表示飞行模式禁用
-    -- 实测永远返回 false？即使飞行模式已启用
     info.flymode = mobile.flymode()
 
     return info
 end
 
+-- 广播发送到所有串口
 function send_to_uart(data)
     local ok, json_str = pcall(json.encode, data)
     if ok and json_str then
-        uart.write(uartid, "SMS_START:" .. json_str .. ":SMS_END\r\n")
+        local packet = "SMS_START:" .. json_str .. ":SMS_END\r\n"
+        -- 同时写给两个端口
+        uart.write(uart_usb, packet)
+        uart.write(uart_phy, packet)
         return true
     else
         log.error("UART", "JSON Encode Failed", json_str)
@@ -104,25 +121,15 @@ function process_uart_command(cmd_data)
     end
 
     if cmd_data.action == "send_sms" and cmd_data.to and cmd_data.content then
-        local request_id = cmd_data.request_id or os.time()
-        local to = cmd_data.to
-        local content = cmd_data.content
-        -- 在协程中同步发送短信（带超时）
-        sys.taskInit(function()
-            log.info("CMD", "发送短信 ->", to)
-            local result = sms.sendLong(to, content).wait(CONFIG.SMS_SEND_TIMEOUT)
-            local success = (result == true)
-            if not success then
-                log.warn("CMD", "短信发送失败或超时", to)
-            end
-            send_to_uart({
-                type = "sms_send_result",
-                success = success,
-                request_id = request_id,
-                to = to,
-                timestamp = os.time()
-            })
-        end)
+        -- 优化：将发送任务入队，而不是直接发送
+        local task = {
+            to = cmd_data.to,
+            content = cmd_data.content,
+            request_id = cmd_data.request_id or os.time()
+        }
+        table.insert(sms_send_queue, task)
+        sys.publish("NEW_SMS_TASK") -- 唤醒消费者
+        log.info("CMD", "短信任务已入队", task.to)
 
     elseif cmd_data.action == "get_status" then
         send_to_uart({
@@ -134,14 +141,10 @@ function process_uart_command(cmd_data)
         })
 
     elseif cmd_data.action == "set_flymode" and cmd_data.enabled ~= nil then
-        -- 规范化为布尔值：兼容 true/false、1/0、"true"/"false"
-        -- Lua 中 0 也是真值，必须显式转换
+        -- 规范化为布尔值
         local flymode_enabled = (cmd_data.enabled == true or cmd_data.enabled == 1 or
                                  cmd_data.enabled == "true" or cmd_data.enabled == "1")
 
-        -- 设置飞行模式（0 表示 sim0）
-        -- enabled = true 表示启用飞行模式（禁用蜂窝网络）
-        -- enabled = false 表示禁用飞行模式（启用蜂窝网络）
         mobile.flymode(0, flymode_enabled)
 
         if not flymode_enabled then
@@ -168,6 +171,44 @@ function process_uart_command(cmd_data)
         send_to_uart({type = "error", msg = "unknown command"})
     end
 end
+
+-- =================================================================================
+-- 异步任务消费者 (短信发送)
+-- =================================================================================
+
+sys.taskInit(function()
+    while true do
+        if #sms_send_queue > 0 then
+            -- 取出第一个任务 (FIFO)
+            local task = table.remove(sms_send_queue, 1)
+
+            log.info("Queue", "开始处理短信任务", task.to, "剩余任务:", #sms_send_queue)
+
+            -- 执行发送（阻塞操作，独占硬件）
+            local result = sms.sendLong(task.to, task.content).wait(CONFIG.SMS_SEND_TIMEOUT)
+            local success = (result == true)
+
+            if not success then
+                log.warn("Queue", "短信发送失败或超时", task.to)
+            end
+
+            -- 发送结果回传给上位机
+            send_to_uart({
+                type = "sms_send_result",
+                success = success,
+                request_id = task.request_id,
+                to = task.to,
+                timestamp = os.time()
+            })
+
+            -- 适当延时，给模组喘息时间
+            sys.wait(500)
+        else
+            -- 队列为空，等待新消息通知或超时轮询
+            sys.waitUntil("NEW_SMS_TASK", 1000)
+        end
+    end
+end)
 
 -- =================================================================================
 -- 事件监听区
@@ -214,12 +255,6 @@ sys.subscribe("CC_IND", function(state)
 
         call_ring_count = call_ring_count + 1
 
-        -- 响4声后自动挂断（可根据需求调整）
---         if call_ring_count > 3 then
---             log.info("Call", "自动挂断来电")
---             cc.hangUp()
---         end
-
     elseif state == "DISCONNECTED" then
         -- 电话被挂断
         log.info("Call", "通话结束")
@@ -232,27 +267,48 @@ sys.subscribe("CC_IND", function(state)
 end)
 
 -- =================================================================================
--- 任务循环区
+-- 串口接收处理 (通用处理函数)
 -- =================================================================================
 
-uart.on(uartid, "receive", function(id, len)
+local function handle_uart_receive(id, len)
     local chunk = uart.read(id, len)
-    if not chunk then return end
+    if not chunk or #chunk == 0 then return end
 
-    uart_recv_buffer = uart_recv_buffer .. chunk
+    -- 获取当前串口的缓冲区
+    local buffer_table = uart_buffers[id]
+    table.insert(buffer_table, chunk)
 
-    -- 使用与下行一致的包围标志：CMD_START:{json}:CMD_END
+    -- 合并检查完整包
+    -- 策略：为了性能，这里每次都会 concat，如果数据量特别大建议优化策略
+    -- 但考虑到指令一般很短，直接 concat 问题不大
+    local current_str = table.concat(buffer_table)
+
     while true do
-        local start_pos = uart_recv_buffer:find("CMD_START:", 1, true)
-        if not start_pos then break end
+        local start_pos = current_str:find("CMD_START:", 1, true)
+        if not start_pos then
+            -- 如果缓冲区过大且无头，清空
+            if #current_str > CONFIG.UART_BUFFER_MAX then
+                log.error("UART", "Buffer Overflow - 清空缓冲区")
+                uart_buffers[id] = {}
+                send_to_uart({type="error", msg="Buffer overflow, cleared"})
+            end
+            break
+        end
 
-        local end_pos = uart_recv_buffer:find(":CMD_END", start_pos + 10, true)
-        if not end_pos then break end  -- 数据未接收完整，等待下次
+        local end_pos = current_str:find(":CMD_END", start_pos + 10, true)
+        if not end_pos then break end  -- 数据不完整，等待
 
         -- 提取 JSON 部分
-        local json_str = uart_recv_buffer:sub(start_pos + 10, end_pos - 1)
-        -- 移除已处理的数据
-        uart_recv_buffer = uart_recv_buffer:sub(end_pos + 8)
+        local json_str = current_str:sub(start_pos + 10, end_pos - 1)
+
+        -- 移除已处理部分
+        current_str = current_str:sub(end_pos + 8)
+
+        -- 更新缓冲区 table
+        uart_buffers[id] = {}
+        if #current_str > 0 then
+            table.insert(uart_buffers[id], current_str)
+        end
 
         if #json_str > 0 then
             local success, cmd = pcall(json.decode, json_str)
@@ -263,15 +319,18 @@ uart.on(uartid, "receive", function(id, len)
                 send_to_uart({type="error", msg="Invalid JSON"})
             end
         end
-    end
 
-    -- 溢出保护：如果缓冲区过大且找不到有效包，清空
-    if #uart_recv_buffer > CONFIG.UART_BUFFER_MAX then
-        log.error("UART", "Buffer Overflow - 清空缓冲区")
-        uart_recv_buffer = ""
-        send_to_uart({type="error", msg="Buffer overflow, cleared"})
+        -- 继续循环处理可能存在的下一个包
     end
-end)
+end
+
+-- 注册两个串口的监听事件
+uart.on(uart_usb, "receive", handle_uart_receive)
+uart.on(uart_phy, "receive", handle_uart_receive)
+
+-- =================================================================================
+-- 后台维护任务
+-- =================================================================================
 
 sys.taskInit(function()
     while true do

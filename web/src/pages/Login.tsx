@@ -73,7 +73,7 @@ export default function Login() {
             <Card className="w-full max-w-md shadow-xl border border-slate-100">
                 <CardHeader className="space-y-2 text-center pb-2">
                     <CardTitle className="text-3xl font-semibold tracking-tight text-slate-900 mt-6">
-                        UART 短信转发器
+                        SMSHub
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 pb-7 space-y-6">

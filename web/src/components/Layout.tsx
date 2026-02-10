@@ -28,15 +28,29 @@ export default function Layout() {
         queryFn: getVersion,
     });
 
-    // 获取设备状态 - 每 10 秒自动刷新
-    const {data: deviceStatus} = useQuery<DeviceStatus>({
-        queryKey: ['deviceStatus'],
+    // 获取所有设备列表状态 - 每 5 秒自动刷新
+    const {data: devices} = useQuery({
+        queryKey: ['devices'],
         queryFn: async () => {
-            const res = await getStatus();
-            return res as DeviceStatus;
+            // 这里我们需要引入 devicesApi，或者直接 fetch /api/devices
+            // 由于 Layout 中没有引入 devicesApi，我们需要添加 import
+            const response = await fetch('/api/devices', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            if (!response.ok) return [];
+            return response.json();
         },
-        refetchInterval: 10000,
+        refetchInterval: 5000,
     });
+
+    // 统计在线设备
+    const onlineCount = Array.isArray(devices)
+        ? devices.filter((d: any) => d.status === 'online').length
+        : 0;
+    const totalCount = Array.isArray(devices) ? devices.length : 0;
+    const isAllOffline = totalCount > 0 && onlineCount === 0;
 
     const isActive = (path: string) => {
         if (path === '/') {
@@ -52,28 +66,6 @@ export default function Layout() {
 
         toast.success('已退出登录');
         navigate('/login');
-    };
-
-    // 计算信号强度百分比（信号等级 0-31 转换为 0-100%）
-    const getSignalPercentage = () => {
-        if (!deviceStatus?.mobile?.signal_level) return 0;
-        return Math.round((deviceStatus.mobile.signal_level / 31) * 100);
-    };
-
-    // 获取信号强度颜色
-    const getSignalColor = () => {
-        const percentage = getSignalPercentage();
-        if (percentage >= 70) return 'text-green-600';
-        if (percentage >= 40) return 'text-yellow-600';
-        return 'text-red-600';
-    };
-
-    // 缩短串口名称显示
-    const getShortPortName = (portName: string) => {
-        if (!portName) return '未连接';
-        // 如果是 /dev/ttyUSB0 这样的路径，只显示最后部分
-        const parts = portName.split('/');
-        return parts[parts.length - 1];
     };
 
     return (
@@ -119,18 +111,18 @@ export default function Layout() {
 
                         {/* 右侧：设备状态和用户信息 */}
                         <div className="hidden md:flex items-center space-x-2 lg:space-x-4">
-                            <div className="flex flex-col">
+                            <div className="flex flex-col items-end">
                                 <div className="flex items-center gap-2">
                                     <div className={cn(
-                                        "w-2 h-2  rounded-full animate-pulse",
-                                        deviceStatus?.connected ? 'bg-green-500' : 'bg-red-500',
+                                        "w-2 h-2 rounded-full animate-pulse",
+                                        onlineCount > 0 ? 'bg-green-500' : 'bg-red-500',
                                     )}/>
                                     <div className={'text-xs font-medium text-gray-600'}>
-                                        {deviceStatus?.connected ? '设备在线' : '设备离线'}
+                                        {totalCount === 0 ? '无设备' : `${onlineCount}/${totalCount} 在线`}
                                     </div>
                                 </div>
                                 <div className="text-[10px] text-gray-400 font-mono mt-0.5">
-                                    {deviceStatus?.port_name}
+                                    {onlineCount > 0 ? '运行正常' : '检查连接'}
                                 </div>
                             </div>
 
@@ -148,10 +140,10 @@ export default function Layout() {
 
                         {/* 移动端用户菜单 */}
                         <div className="flex md:hidden items-center space-x-2">
-                            {deviceStatus?.connected && (
+                            {onlineCount > 0 && (
                                 <div className="flex items-center space-x-1 px-2 py-1 bg-green-50 rounded-lg">
                                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"/>
-                                    <span className="text-xs font-medium text-green-700">在线</span>
+                                    <span className="text-xs font-medium text-green-700">{onlineCount}在线</span>
                                 </div>
                             )}
                             <Button

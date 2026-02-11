@@ -189,7 +189,7 @@ export default function ScheduledTasksConfig() {
             intervalDays: task.intervalDays,
             phoneNumber: task.phoneNumber,
             content: task.content,
-            deviceId: (task as any).deviceId || 'auto',
+            deviceId: task.deviceId || 'auto',
         });
         setDialogOpen(true);
     };
@@ -339,7 +339,7 @@ export default function ScheduledTasksConfig() {
                                             <span
                                                 className="text-xs text-gray-400 font-medium block mb-0.5">发送设备</span>
                                             <span
-                                                className="text-sm text-gray-700 font-semibold">{getDeviceName((task as any).deviceId)}</span>
+                                                className="text-sm text-gray-700 font-semibold">{getDeviceName(task.deviceId)}</span>
                                         </div>
                                     </div>
 

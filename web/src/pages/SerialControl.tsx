@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import {devicesApi} from '@/api/devices';
 import type {Device} from '@/api/devices';
+import { SignalStrength } from '@/components/SignalStrength';
 import {formatUptime} from "@/utils/utils.ts";
 
 export default function SerialControl() {
@@ -104,15 +105,6 @@ export default function SerialControl() {
         sendSMSMutation.mutate({to, content});
     };
 
-    // 获取信号描述
-    const getSignalDescription = (level: number) => {
-        if (level >= 20) return '优秀';
-        if (level >= 15) return '良好';
-        if (level >= 10) return '一般';
-        if (level >= 5) return '较差';
-        return '很差';
-    };
-
     return (
         <div className="flex flex-col overflow-hidden">
             {/* 顶部标题和设备选择 */}
@@ -188,9 +180,10 @@ export default function SerialControl() {
                                     </div>
                                     <div className="flex justify-between items-center pb-2 border-b">
                                         <span className="text-xs text-gray-500">信号强度</span>
-                                        <span className="text-sm font-medium">
-                                            {selectedDevice.signalLevel} <span className="text-xs text-gray-400">({getSignalDescription(selectedDevice.signalLevel)})</span>
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-medium">{selectedDevice.signalLevel}</span>
+                                            <SignalStrength level={selectedDevice.signalLevel} showText={true} />
+                                        </div>
                                     </div>
                                     <div className="flex justify-between items-center pb-2 border-b">
                                         <span className="text-xs text-gray-500">信号百分比</span>

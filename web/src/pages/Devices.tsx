@@ -36,6 +36,8 @@ import {
     Search,
 } from 'lucide-react';
 
+import { SignalStrength } from '@/components/SignalStrength';
+
 export default function Devices() {
     const queryClient = useQueryClient();
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -183,15 +185,6 @@ export default function Devices() {
             default:
                 return '未知';
         }
-    };
-
-    const getSignalBars = (level: number) => {
-        const percentage = Math.round((level / 31) * 100);
-        if (percentage >= 75) return 4;
-        if (percentage >= 50) return 3;
-        if (percentage >= 25) return 2;
-        if (percentage > 0) return 1;
-        return 0;
     };
 
     if (isLoading) {
@@ -354,19 +347,7 @@ export default function Devices() {
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <span className="text-gray-500">信号:</span>
-                                    <div className="flex items-end gap-0.5 h-4">
-                                        {[1, 2, 3, 4].map((bar) => (
-                                            <div
-                                                key={bar}
-                                                className={`w-1 rounded-sm transition-all ${
-                                                    bar <= getSignalBars(device.signalLevel)
-                                                        ? 'bg-green-500'
-                                                        : 'bg-gray-200'
-                                                }`}
-                                                style={{height: `${bar * 4}px`}}
-                                            />
-                                        ))}
-                                    </div>
+                                    <SignalStrength level={device.signalLevel} />
                                 </div>
                             </div>
 

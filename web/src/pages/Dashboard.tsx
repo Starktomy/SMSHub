@@ -1,45 +1,32 @@
-import {useEffect, useState} from 'react';
-import {Globe, MessageSquare, Signal, TrendingUp, Router, Wifi, WifiOff} from 'lucide-react';
-import {getStats} from '../api/messages';
-import type {Stats} from '../api/types';
-import {StatCard} from "@/components/StatsCard.tsx";
-import {useQuery} from "@tanstack/react-query";
-import {devicesApi} from "@/api/devices";
-import type {Device} from "@/api/devices";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {cn} from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { Globe, MessageSquare, Router, Signal, TrendingUp, Wifi, WifiOff } from 'lucide-react';
+import { getStats } from '../api/messages';
+import { devicesApi } from "@/api/devices";
+import type { Device } from "@/api/devices";
+import { StatCard } from "@/components/StatsCard";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { SignalStrength } from "@/components/SignalStrength";
 
 export default function Dashboard() {
-    const [stats, setStats] = useState<Stats | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        loadStats();
-        const interval = setInterval(loadStats, 30000); // 每30秒刷新
-        return () => clearInterval(interval);
-    }, []);
-
-    const loadStats = async () => {
-        try {
-            const data = await getStats();
-            setStats(data);
-        } catch (error) {
-            console.error('获取统计信息失败:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    // 获取统计信息 - 每 30 秒自动刷新
+    const { data: stats, isLoading: statsLoading } = useQuery({
+        queryKey: ['stats'],
+        queryFn: getStats,
+        refetchInterval: 30000,
+    });
 
     // 获取设备列表 - 每 10 秒自动刷新
-    const {data: devices = []} = useQuery<Device[]>({
+    const { data: devices = [], isLoading: devicesLoading } = useQuery<Device[]>({
         queryKey: ['devices'],
         queryFn: devicesApi.list,
         refetchInterval: 10000,
     });
 
+    const loading = statsLoading || devicesLoading;
+
     // 统计设备数量
     const onlineDevices = devices.filter(d => d.status === 'online');
-    const offlineDevices = devices.filter(d => d.status === 'offline');
 
     // 获取信号最好的设备
     const bestSignalDevice = onlineDevices.length > 0
@@ -48,16 +35,7 @@ export default function Dashboard() {
         )
         : null;
 
-    // 获取信号描述
-    const getSignalDescription = (level: number) => {
-        if (level >= 20) return '优秀';
-        if (level >= 15) return '良好';
-        if (level >= 10) return '一般';
-        if (level >= 5) return '较差';
-        return '很差';
-    };
-
-    if (loading) {
+    if (loading && !stats && devices.length === 0) {
         return (
             <div className="flex justify-center items-center h-64">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -84,7 +62,13 @@ export default function Dashboard() {
                     unit="%"
                     icon={Signal}
                     colorClass="bg-blue-100 text-blue-600"
-                    subValue={bestSignalDevice ? `${bestSignalDevice.name || bestSignalDevice.serialPort} • ${getSignalDescription(bestSignalDevice.signalLevel)}` : '无在线设备'}
+                    subValue={bestSignalDevice ? (
+                        <div className="flex items-center gap-1">
+                            <span>{bestSignalDevice.name || bestSignalDevice.serialPort}</span>
+                            <span>•</span>
+                            <SignalStrength level={bestSignalDevice.signalLevel} className="scale-75 origin-left" />
+                        </div>
+                    ) : '无在线设备'}
                 />
                 <StatCard
                     label="总短信数"
@@ -134,7 +118,7 @@ export default function Dashboard() {
                                             ) : (
                                                 <WifiOff className="w-4 h-4 text-gray-400" />
                                             )}
-                                            <span className="font-medium">
+                                            <span className="font-medium truncate max-w-[120px]" title={device.name || device.serialPort}>
                                                 {device.name || device.serialPort}
                                             </span>
                                         </div>
@@ -160,9 +144,8 @@ export default function Dashboard() {
                                             </div>
                                         )}
                                         {device.status === 'online' && (
-                                            <div className="flex items-center gap-1">
-                                                <Signal className="w-3 h-3" />
-                                                <span>信号: {Math.round((device.signalLevel / 31) * 100)}%</span>
+                                            <div className="flex items-center gap-1 mt-1">
+                                                <SignalStrength level={device.signalLevel} showText={true} />
                                             </div>
                                         )}
                                     </div>

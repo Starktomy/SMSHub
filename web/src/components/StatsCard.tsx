@@ -6,7 +6,7 @@ export interface Props {
     value?: number | string;
     icon: React.FC<{ size: number } & React.SVGProps<SVGSVGElement>>;
     unit?: string;
-    subValue?: string;
+    subValue?: React.ReactNode;
     colorClass: string;
 }
 

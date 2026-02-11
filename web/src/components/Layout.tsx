@@ -3,8 +3,8 @@ import {Bell, Clock, LayoutDashboard, LogOut, MessageSquare, Smartphone, Send, R
 import {Button} from "@/components/ui/button.tsx";
 import {useQuery} from "@tanstack/react-query";
 import {getVersion} from "@/api/property.ts";
-import {getStatus} from "@/api/serial.ts";
-import type {DeviceStatus} from "@/api/types.ts";
+import {devicesApi} from "@/api/devices";
+import type {Device} from "@/api/devices";
 import {cn} from "@/lib/utils.ts";
 import {toast} from 'sonner';
 
@@ -29,27 +29,15 @@ export default function Layout() {
     });
 
     // 获取所有设备列表状态 - 每 5 秒自动刷新
-    const {data: devices} = useQuery({
+    const {data: devices = []} = useQuery<Device[]>({
         queryKey: ['devices'],
-        queryFn: async () => {
-            // 这里我们需要引入 devicesApi，或者直接 fetch /api/devices
-            // 由于 Layout 中没有引入 devicesApi，我们需要添加 import
-            const response = await fetch('/api/devices', {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-            if (!response.ok) return [];
-            return response.json();
-        },
+        queryFn: devicesApi.list,
         refetchInterval: 5000,
     });
 
     // 统计在线设备
-    const onlineCount = Array.isArray(devices)
-        ? devices.filter((d: any) => d.status === 'online').length
-        : 0;
-    const totalCount = Array.isArray(devices) ? devices.length : 0;
+    const onlineCount = devices.filter(d => d.status === 'online').length;
+    const totalCount = devices.length;
     const isAllOffline = totalCount > 0 && onlineCount === 0;
 
     const isActive = (path: string) => {

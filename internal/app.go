@@ -188,12 +188,21 @@ func setDefaultConfig(appConfig *config.AppConfig, logger *zap.Logger) {
 
 // autoMigrate 数据库迁移
 func autoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&models.Property{},
 		&models.TextMessage{},
 		&models.ScheduledTask{},
 		&models.Device{},
-	)
+	); err != nil {
+		return err
+	}
+
+	// 数据迁移：将旧的 from/to 字段数据迁移到新字段 from_number/to_number
+	// 忽略错误，因为如果旧列不存在（全新安装），SQL 会执行失败
+	_ = db.Exec("UPDATE text_messages SET from_number = `from` WHERE (from_number IS NULL OR from_number = '') AND `from` IS NOT NULL").Error
+	_ = db.Exec("UPDATE text_messages SET to_number = `to` WHERE (to_number IS NULL OR to_number = '') AND `to` IS NOT NULL").Error
+
+	return nil
 }
 
 // setupApi 设置API路由

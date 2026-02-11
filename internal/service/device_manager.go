@@ -213,6 +213,8 @@ func (dm *DeviceManager) updateDeviceStatus(deviceID string, status *StatusData)
 
 	if status != nil {
 		columns["phone_number"] = status.Mobile.Number
+		columns["imsi"] = status.Mobile.Imsi
+		columns["iccid"] = status.Mobile.Iccid
 		columns["operator"] = status.Mobile.Operator
 		columns["signal_level"] = status.Mobile.SignalLevel
 		columns["flymode"] = status.Flymode
@@ -263,7 +265,9 @@ func (dm *DeviceManager) checkDevicesHealth() {
 		if now.Sub(lastSeen) > HeartbeatTimeout {
 			if device.Status != models.DeviceStatusOffline {
 				_ = dm.repo.UpdateColumnsById(ctx, id, map[string]any{
-					"status": models.DeviceStatusOffline,
+					"status":       models.DeviceStatusOffline,
+					"signal_level": 0,
+					"operator":     "",
 				})
 				dm.logger.Warn("设备心跳超时，标记为离线",
 					zap.String("id", id),
@@ -320,6 +324,7 @@ func (dm *DeviceManager) UpdateDevice(ctx context.Context, device *models.Device
 	existing.SerialPort = device.SerialPort
 	existing.Enabled = device.Enabled
 	existing.GroupName = device.GroupName
+	existing.PhoneNumber = device.PhoneNumber
 	existing.UpdatedAt = time.Now().UnixMilli()
 
 	if err := dm.repo.Save(ctx, existing); err != nil {

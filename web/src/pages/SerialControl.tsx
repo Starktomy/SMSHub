@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {Activity, RotateCcw, Send, Signal, Wifi, Router} from 'lucide-react';
+import {Activity, RotateCcw, Send, Signal, Wifi, Router, Edit2, Check, X} from 'lucide-react';
 import {toast} from 'sonner';
 import {useMutation, useQuery} from '@tanstack/react-query';
 import {Input} from '@/components/ui/input';
@@ -22,6 +22,10 @@ export default function SerialControl() {
     const [content, setContent] = useState('');
     const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
 
+    // 手机号编辑状态
+    const [isEditingPhone, setIsEditingPhone] = useState(false);
+    const [tempPhone, setTempPhone] = useState('');
+
     // 获取设备列表 - 每 10 秒自动刷新
     const {data: devices = [], refetch: refetchDevices} = useQuery<Device[]>({
         queryKey: ['devices'],
@@ -39,6 +43,29 @@ export default function SerialControl() {
     if (!selectedDeviceId && onlineDevices.length > 0) {
         setSelectedDeviceId(onlineDevices[0].id);
     }
+
+    // 更新设备 Mutation
+    const updateDeviceMutation = useMutation({
+        mutationFn: (data: { id: string; phoneNumber: string }) => {
+            if (!selectedDevice) return Promise.reject(new Error('未选择设备'));
+            return devicesApi.update(data.id, {
+                name: selectedDevice.name,
+                serialPort: selectedDevice.serialPort,
+                groupName: selectedDevice.groupName,
+                enabled: selectedDevice.enabled,
+                phoneNumber: data.phoneNumber,
+            });
+        },
+        onSuccess: () => {
+            toast.success('手机号已更新');
+            setIsEditingPhone(false);
+            refetchDevices();
+        },
+        onError: (error) => {
+            console.error('更新失败:', error);
+            toast.error('更新失败');
+        },
+    });
 
     // 发送短信 Mutation
     const sendSMSMutation = useMutation({
@@ -111,7 +138,10 @@ export default function SerialControl() {
                 <h1 className="text-2xl font-bold text-gray-900">设备控制</h1>
                 <div className="flex items-center gap-3">
                     <Router className="w-4 h-4 text-gray-400" />
-                    <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
+                    <Select value={selectedDeviceId} onValueChange={(val) => {
+                        setSelectedDeviceId(val);
+                        setIsEditingPhone(false);
+                    }}>
                         <SelectTrigger className="w-64">
                             <SelectValue placeholder="选择设备" />
                         </SelectTrigger>
@@ -190,14 +220,73 @@ export default function SerialControl() {
                                             {Math.round((selectedDevice.signalLevel / 31) * 100)}%
                                         </span>
                                     </div>
-                                    {selectedDevice.phoneNumber && (
-                                        <div className="pt-1">
-                                            <div className="text-xs text-gray-500 mb-1">手机号</div>
-                                            <div className="font-mono text-xs bg-gray-50 p-1.5 rounded break-all">
-                                                {selectedDevice.phoneNumber}
-                                            </div>
+                                    <div className="flex justify-between items-center pb-2 border-b">
+                                        <span className="text-xs text-gray-500">IMSI</span>
+                                        <span className="text-sm font-mono font-medium">
+                                            {selectedDevice.imsi || '未知'}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center pb-2 border-b">
+                                        <span className="text-xs text-gray-500">ICCID</span>
+                                        <span className="text-sm font-mono font-medium">
+                                            {selectedDevice.iccid || '未知'}
+                                        </span>
+                                    </div>
+
+                                    <div className="pt-1">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-xs text-gray-500">手机号</span>
+                                            {!isEditingPhone ? (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-6 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                                    onClick={() => {
+                                                        setTempPhone(selectedDevice.phoneNumber || '');
+                                                        setIsEditingPhone(true);
+                                                    }}
+                                                >
+                                                    <Edit2 className="w-3 h-3 mr-1"/>
+                                                    编辑
+                                                </Button>
+                                            ) : (
+                                                <div className="flex items-center gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                        onClick={() => updateDeviceMutation.mutate({
+                                                            id: selectedDevice.id,
+                                                            phoneNumber: tempPhone
+                                                        })}
+                                                    >
+                                                        <Check className="w-4 h-4"/>
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                        onClick={() => setIsEditingPhone(false)}
+                                                    >
+                                                        <X className="w-4 h-4"/>
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
+
+                                        {isEditingPhone ? (
+                                            <Input
+                                                value={tempPhone}
+                                                onChange={(e) => setTempPhone(e.target.value)}
+                                                className="h-8 font-mono text-sm"
+                                                placeholder="请输入手机号"
+                                            />
+                                        ) : (
+                                            <div className="font-mono text-sm bg-gray-50 p-2 rounded break-all min-h-[2.25rem] flex items-center">
+                                                {selectedDevice.phoneNumber || <span className="text-gray-400 italic">未设置</span>}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-full text-gray-400">

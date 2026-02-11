@@ -25,16 +25,18 @@ func (m *mockSerialPort) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func (m *mockSerialPort) Close() error                                                   { return nil }
-func (m *mockSerialPort) SetMode(mode *serial.Mode) error                                { return nil }
-func (m *mockSerialPort) SetReadTimeout(t time.Duration) error                           { return nil }
-func (m *mockSerialPort) ResetInputBuffer() error                                        { return nil }
-func (m *mockSerialPort) ResetOutputBuffer() error                                       { return nil }
-func (m *mockSerialPort) SetDTR(dtr bool) error                                          { return nil }
-func (m *mockSerialPort) SetRTS(rts bool) error                                          { return nil }
-func (m *mockSerialPort) GetModemStatusBits() (*serial.ModemStatusBits, error)           { return &serial.ModemStatusBits{}, nil }
-func (m *mockSerialPort) Break(d time.Duration) error                                    { return nil }
-func (m *mockSerialPort) Drain() error                                                   { return nil }
+func (m *mockSerialPort) Close() error                         { return nil }
+func (m *mockSerialPort) SetMode(mode *serial.Mode) error      { return nil }
+func (m *mockSerialPort) SetReadTimeout(t time.Duration) error { return nil }
+func (m *mockSerialPort) ResetInputBuffer() error              { return nil }
+func (m *mockSerialPort) ResetOutputBuffer() error             { return nil }
+func (m *mockSerialPort) SetDTR(dtr bool) error                { return nil }
+func (m *mockSerialPort) SetRTS(rts bool) error                { return nil }
+func (m *mockSerialPort) GetModemStatusBits() (*serial.ModemStatusBits, error) {
+	return &serial.ModemStatusBits{}, nil
+}
+func (m *mockSerialPort) Break(d time.Duration) error { return nil }
+func (m *mockSerialPort) Drain() error                { return nil }
 
 func TestSerialService_StateManagement(t *testing.T) {
 	logger := zap.NewExample()

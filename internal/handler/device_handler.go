@@ -92,10 +92,11 @@ func (h *DeviceHandler) Create(c echo.Context) error {
 
 // UpdateDeviceRequest 更新设备请求
 type UpdateDeviceRequest struct {
-	Name       string `json:"name"`
-	SerialPort string `json:"serialPort"`
-	GroupName  string `json:"groupName"`
-	Enabled    bool   `json:"enabled"`
+	Name        string `json:"name"`
+	SerialPort  string `json:"serialPort"`
+	GroupName   string `json:"groupName"`
+	Enabled     bool   `json:"enabled"`
+	PhoneNumber string `json:"phoneNumber"`
 }
 
 // Update 更新设备信息
@@ -110,11 +111,12 @@ func (h *DeviceHandler) Update(c echo.Context) error {
 	}
 
 	device := &models.Device{
-		ID:         id,
-		Name:       req.Name,
-		SerialPort: req.SerialPort,
-		GroupName:  req.GroupName,
-		Enabled:    req.Enabled,
+		ID:          id,
+		Name:        req.Name,
+		SerialPort:  req.SerialPort,
+		GroupName:   req.GroupName,
+		Enabled:     req.Enabled,
+		PhoneNumber: req.PhoneNumber,
 	}
 
 	if err := h.deviceManager.UpdateDevice(c.Request().Context(), device); err != nil {

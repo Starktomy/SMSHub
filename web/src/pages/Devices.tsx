@@ -185,7 +185,7 @@ export default function Devices() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-64">
+            <div className="flex items-center justify-center h-64" data-testid="loading-spinner">
                 <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
             </div>
         );

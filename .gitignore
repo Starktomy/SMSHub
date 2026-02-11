@@ -10,3 +10,5 @@ app.db
 config.yaml
 logs
 .DS_Store
+coverage.out
+web/coverage/

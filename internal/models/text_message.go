@@ -19,8 +19,8 @@ const (
 // TextMessage 短信记录
 type TextMessage struct {
 	ID         string        `gorm:"primaryKey" json:"id"`                  // UUID
-	From       string        `gorm:"index" json:"from"`                     // 发送方号码
-	To         string        `gorm:"index" json:"to"`                       // 接收方号码
+	From       string        `gorm:"column:from_number;index" json:"from"`  // 发送方号码
+	To         string        `gorm:"column:to_number;index" json:"to"`      // 接收方号码
 	Content    string        `gorm:"type:text" json:"content"`              // 短信内容
 	Type       MessageType   `gorm:"index" json:"type"`                     // 消息类型：incoming（收到）、outgoing（发送）
 	Status     MessageStatus `gorm:"index" json:"status"`                   // 状态：received、sent、failed

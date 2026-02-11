@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -21,7 +22,8 @@ type OIDCService struct {
 	provider     *oidc.Provider
 	oauth2Config oauth2.Config
 	verifier     *oidc.IDTokenVerifier
-	stateStore   map[string]time.Time // 简单的 state 存储（生产环境应使用 Redis 等）
+	stateMu      sync.RWMutex
+	stateStore   map[string]time.Time
 }
 
 // NewOIDCService 创建 OIDC 服务
@@ -99,7 +101,9 @@ func (s *OIDCService) GenerateAuthURL() (string, string, error) {
 	}
 
 	// 存储 state（有效期 10 分钟）
+	s.stateMu.Lock()
 	s.stateStore[state] = time.Now().Add(10 * time.Minute)
+	s.stateMu.Unlock()
 
 	// 清理过期的 state
 	s.cleanExpiredStates()
@@ -114,13 +118,10 @@ func (s *OIDCService) ExchangeCode(ctx context.Context, code, state string) (str
 		return "", "", errors.New("OIDC 未启用")
 	}
 
-	// 验证 state
-	if !s.validateState(state) {
+	// 验证并删除已使用的 state
+	if !s.validateAndDeleteState(state) {
 		return "", "", errors.New("无效的 state")
 	}
-
-	// 删除已使用的 state
-	delete(s.stateStore, state)
 
 	// 交换授权码
 	oauth2Token, err := s.oauth2Config.Exchange(ctx, code)
@@ -183,17 +184,24 @@ func (s *OIDCService) generateState() (string, error) {
 	return base64.URLEncoding.EncodeToString(b), nil
 }
 
-// validateState 验证 state
-func (s *OIDCService) validateState(state string) bool {
+// validateAndDeleteState 验证并删除 state（原子操作）
+func (s *OIDCService) validateAndDeleteState(state string) bool {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
 	expiresAt, exists := s.stateStore[state]
 	if !exists {
 		return false
 	}
+	delete(s.stateStore, state)
 	return time.Now().Before(expiresAt)
 }
 
 // cleanExpiredStates 清理过期的 state
 func (s *OIDCService) cleanExpiredStates() {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
 	now := time.Now()
 	for state, expiresAt := range s.stateStore {
 		if now.After(expiresAt) {

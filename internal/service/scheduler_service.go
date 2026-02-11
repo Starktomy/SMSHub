@@ -129,6 +129,14 @@ func (s *SchedulerService) Start(ctx context.Context) error {
 	return nil
 }
 
+// Stop 停止定时任务服务
+func (s *SchedulerService) Stop() {
+	if s.cron != nil {
+		s.cron.Stop()
+		s.logger.Info("定时任务服务已停止")
+	}
+}
+
 // checkAndExecuteTasks 检查并执行满足条件的任务
 func (s *SchedulerService) checkAndExecuteTasks() error {
 	ctx := context.Background()

@@ -83,7 +83,7 @@ func (h *DeviceHandler) Create(c echo.Context) error {
 	if err := h.deviceManager.CreateDevice(c.Request().Context(), device); err != nil {
 		h.logger.Error("创建设备失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "创建设备失败",
 		})
 	}
 
@@ -120,7 +120,7 @@ func (h *DeviceHandler) Update(c echo.Context) error {
 	if err := h.deviceManager.UpdateDevice(c.Request().Context(), device); err != nil {
 		h.logger.Error("更新设备失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "更新设备失败",
 		})
 	}
 
@@ -136,7 +136,7 @@ func (h *DeviceHandler) Delete(c echo.Context) error {
 	if err := h.deviceManager.DeleteDevice(c.Request().Context(), id); err != nil {
 		h.logger.Error("删除设备失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "删除设备失败",
 		})
 	}
 
@@ -152,7 +152,7 @@ func (h *DeviceHandler) Enable(c echo.Context) error {
 	if err := h.deviceManager.EnableDevice(c.Request().Context(), id); err != nil {
 		h.logger.Error("启用设备失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "启用设备失败",
 		})
 	}
 
@@ -168,7 +168,7 @@ func (h *DeviceHandler) Disable(c echo.Context) error {
 	if err := h.deviceManager.DisableDevice(c.Request().Context(), id); err != nil {
 		h.logger.Error("禁用设备失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "禁用设备失败",
 		})
 	}
 
@@ -196,7 +196,7 @@ func (h *DeviceHandler) SetFlymode(c echo.Context) error {
 	if err := h.deviceManager.SetDeviceFlymode(c.Request().Context(), id, req.Enabled); err != nil {
 		h.logger.Error("设置飞行模式失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "设置飞行模式失败",
 		})
 	}
 
@@ -212,7 +212,7 @@ func (h *DeviceHandler) Reboot(c echo.Context) error {
 	if err := h.deviceManager.RebootDevice(c.Request().Context(), id); err != nil {
 		h.logger.Error("重启设备失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "重启设备失败",
 		})
 	}
 
@@ -228,7 +228,7 @@ func (h *DeviceHandler) GetStatus(c echo.Context) error {
 	status, err := h.deviceManager.GetDeviceStatus(c.Request().Context(), id)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "获取设备状态失败",
 		})
 	}
 
@@ -242,7 +242,7 @@ func (h *DeviceHandler) Discover(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("扫描串口失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "扫描串口失败",
 		})
 	}
 
@@ -258,7 +258,7 @@ func (h *DeviceHandler) GetGroups(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("获取设备分组失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "获取设备分组失败",
 		})
 	}
 
@@ -294,7 +294,7 @@ func (h *DeviceHandler) SendSMS(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("发送短信失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "发送短信失败",
 		})
 	}
 
@@ -335,7 +335,7 @@ func (h *DeviceHandler) AutoSendSMS(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("发送短信失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "发送短信失败",
 		})
 	}
 
@@ -380,7 +380,7 @@ func (h *DeviceHandler) GetStats(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("获取设备统计失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "获取设备统计失败",
 		})
 	}
 

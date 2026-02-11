@@ -54,7 +54,7 @@ build-servers:
 	$(GOFLAGS) GOOS=freebsd GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -o bin/smshub-freebsd-amd64 cmd/serv/main.go
 
 	@echo "Compressing binaries..."
-	upx bin/smshub-linux-* bin/smshub-windows-* bin/smshub-freebsd-* 2>/dev/null || true
+	upx bin/smshub-linux-* bin/smshub-freebsd-* 2>/dev/null || true
 
 	@echo "All servers built successfully!"
 	@ls -lh bin/

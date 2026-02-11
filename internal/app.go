@@ -151,6 +151,25 @@ func setup(app *orz.App) error {
 		logger.Info("定时任务服务启动成功")
 	}
 
+	// 13. 注册优雅关闭钩子
+	e := app.GetEcho()
+	e.Server.RegisterOnShutdown(func() {
+		logger.Info("开始优雅关闭...")
+
+		// 停止定时任务
+		schedulerService.Stop()
+
+		// 停止串口服务（单设备模式）
+		if appConfig.Serial.Port != "" {
+			serialService.Stop()
+		}
+
+		// 停止设备管理器（内部会停止所有设备的串口服务）
+		deviceManager.Stop()
+
+		logger.Info("优雅关闭完成")
+	})
+
 	logger.Info("应用启动完成")
 	return nil
 }

@@ -63,7 +63,7 @@ func (h *SerialHandler) GetStatus(c echo.Context) error {
 	data, err := h.serialService.GetStatus()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "获取设备状态失败",
 		})
 	}
 
@@ -90,7 +90,7 @@ func (h *SerialHandler) SetFlymode(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("设置飞行模式失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "设置飞行模式失败",
 		})
 	}
 	go h.serialService.RequestCacheUpdate()
@@ -105,7 +105,7 @@ func (h *SerialHandler) RebootMcu(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("重启模块", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "重启模块失败",
 		})
 	}
 	go h.serialService.RequestCacheUpdate()

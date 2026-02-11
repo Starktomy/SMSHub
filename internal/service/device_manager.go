@@ -123,8 +123,8 @@ func (dm *DeviceManager) Stop() {
 	// 停止所有设备
 	dm.devicesMu.Lock()
 	for _, md := range dm.devices {
-		// 设备的 SerialService 会在其 goroutine 中自动清理
 		dm.logger.Info("停止设备", zap.String("id", md.Device.ID))
+		md.SerialService.Stop()
 	}
 	dm.devices = make(map[string]*ManagedDevice)
 	dm.devicesMu.Unlock()
@@ -132,14 +132,15 @@ func (dm *DeviceManager) Stop() {
 
 // startDevice 启动单个设备
 func (dm *DeviceManager) startDevice(device *models.Device) error {
-	dm.devicesMu.Lock()
-	defer dm.devicesMu.Unlock()
+	dm.devicesMu.RLock()
+	_, exists := dm.devices[device.ID]
+	dm.devicesMu.RUnlock()
 
-	if _, exists := dm.devices[device.ID]; exists {
+	if exists {
 		return fmt.Errorf("设备已在运行: %s", device.ID)
 	}
 
-	// 创建串口服务
+	// 创建串口服务（耗时操作，不持锁）
 	serialService := NewSerialServiceWithDeviceID(
 		dm.logger.With(zap.String("device", device.Name)),
 		device.SerialPort,
@@ -164,7 +165,14 @@ func (dm *DeviceManager) startDevice(device *models.Device) error {
 		SerialService: serialService,
 	}
 
+	// 仅在写入 map 时加锁
+	dm.devicesMu.Lock()
+	if _, exists := dm.devices[device.ID]; exists {
+		dm.devicesMu.Unlock()
+		return fmt.Errorf("设备已在运行: %s", device.ID)
+	}
 	dm.devices[device.ID] = md
+	dm.devicesMu.Unlock()
 
 	// 启动串口服务
 	go serialService.Start()

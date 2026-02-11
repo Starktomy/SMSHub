@@ -22,12 +22,16 @@ import (
 
 // Notifier 告警通知服务
 type Notifier struct {
-	logger *zap.Logger
+	logger     *zap.Logger
+	httpClient *http.Client
 }
 
 func NewNotifier(logger *zap.Logger) *Notifier {
 	return &Notifier{
 		logger: logger,
+		httpClient: &http.Client{
+			Timeout: 10 * time.Second,
+		},
 	}
 }
 
@@ -165,12 +169,18 @@ func (n *Notifier) SendTelegramByConfig(ctx context.Context, config map[string]i
 
 func (n *Notifier) sendTelegramByConfig(ctx context.Context, config map[string]interface{}, message string) error {
 	n.logger.Info("config:", zap.Any("config", config))
-	apitoken := config["apiToken"].(string)
-	userid := config["userid"].(string)
-	proxyEnabled := config["proxyEnabled"].(bool)
-	proxyUrl := config["proxyUrl"].(string)
-	proxyUsername := config["proxyUsername"].(string)
-	proxyPassword := config["proxyPassword"].(string)
+	apitoken, ok := config["apiToken"].(string)
+	if !ok || apitoken == "" {
+		return fmt.Errorf("Telegram 配置缺少 apiToken")
+	}
+	userid, ok := config["userid"].(string)
+	if !ok || userid == "" {
+		return fmt.Errorf("Telegram 配置缺少 userid")
+	}
+	proxyEnabled, _ := config["proxyEnabled"].(bool)
+	proxyUrl, _ := config["proxyUrl"].(string)
+	proxyUsername, _ := config["proxyUsername"].(string)
+	proxyPassword, _ := config["proxyPassword"].(string)
 
 	// 构建发送消息的URL
 	baseURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", apitoken)
@@ -259,7 +269,10 @@ func (n *Notifier) sendCustomWebhook(ctx context.Context, config map[string]inte
 	})
 	n.logger.Sugar().Debugf("自定义Webhook请求体: %s", bodyStr)
 	var reqBody = strings.NewReader(bodyStr)
-	var contentType = config["contentType"].(string)
+	contentType, ok := config["contentType"].(string)
+	if !ok || contentType == "" {
+		contentType = "application/json"
+	}
 
 	// 创建请求
 	req, err := http.NewRequestWithContext(ctx, method, webhookURL, reqBody)
@@ -276,11 +289,7 @@ func (n *Notifier) sendCustomWebhook(ctx context.Context, config map[string]inte
 	}
 
 	// 发送请求
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-
-	resp, err := client.Do(req)
+	resp, err := n.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("发送请求失败: %w", err)
 	}
@@ -316,11 +325,7 @@ func (n *Notifier) sendJSONRequest(ctx context.Context, url string, body interfa
 
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-
-	resp, err := client.Do(req)
+	resp, err := n.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("发送请求失败: %w", err)
 	}
@@ -353,12 +358,12 @@ func (n *Notifier) sendJSONRequestWithProxy(ctx context.Context, url string, pro
 	transport := &http.Transport{}
 	transport.Proxy = http.ProxyURL(proxyUrl)
 
-	client := &http.Client{
-		Timeout:   10 * time.Second,
+	proxyClient := &http.Client{
+		Timeout:   n.httpClient.Timeout,
 		Transport: transport,
 	}
 
-	resp, err := client.Do(req)
+	resp, err := proxyClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("发送请求失败: %w", err)
 	}

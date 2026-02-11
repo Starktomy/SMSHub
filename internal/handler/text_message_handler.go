@@ -32,6 +32,9 @@ func NewTextMessageHandler(logger *zap.Logger, service *service.TextMessageServi
 func (h *TextMessageHandler) Delete(c echo.Context) error {
 	id := c.Param("id")
 	if id == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "id 参数不能为空",
+		})
 	}
 
 	if err := h.service.Delete(c.Request().Context(), id); err != nil {

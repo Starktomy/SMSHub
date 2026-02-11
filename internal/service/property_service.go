@@ -29,7 +29,7 @@ func NewPropertyService(logger *zap.Logger, db *gorm.DB) *PropertyService {
 	return &PropertyService{
 		repo:   repo.NewPropertyRepo(db),
 		logger: logger,
-		cache:  cache.New[string, *models.Property](time.Minute), // 0 表示永不过期
+		cache:  cache.New[string, *models.Property](time.Hour),
 	}
 }
 

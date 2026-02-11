@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/Starktomy/smshub/internal/models"
@@ -126,63 +127,76 @@ func (s *TextMessageService) UpdateStatusById(ctx context.Context, id string, st
 func (s *TextMessageService) GetConversations(ctx context.Context) ([]*Conversation, error) {
 	db := s.repo.GetDB(ctx)
 
-	// 获取所有短信记录，按创建时间倒序
-	var messages []models.TextMessage
-	if err := db.Order("created_at DESC").Find(&messages).Error; err != nil {
-		s.logger.Error("获取短信记录失败", zap.Error(err))
-		return nil, fmt.Errorf("获取短信记录失败: %w", err)
+	// 使用 SQL 聚合查询获取每个 peer 的消息计数和最后消息时间
+	type peerSummary struct {
+		Peer         string
+		MessageCount int64
+		LastTime     int64
 	}
 
-	// 按对方号码分组
-	conversationMap := make(map[string]*Conversation)
-	for i := range messages {
-		msg := &messages[i]
+	var incomingSummaries []peerSummary
+	if err := db.Model(&models.TextMessage{}).
+		Select(`"from" as peer, COUNT(*) as message_count, MAX(created_at) as last_time`).
+		Where("type = ?", models.MessageTypeIncoming).
+		Group(`"from"`).
+		Having(`"from" != ''`).
+		Find(&incomingSummaries).Error; err != nil {
+		return nil, fmt.Errorf("获取接收消息统计失败: %w", err)
+	}
 
-		// 确定对方号码
-		var peer string
-		if msg.Type == models.MessageTypeIncoming {
-			peer = msg.From
+	var outgoingSummaries []peerSummary
+	if err := db.Model(&models.TextMessage{}).
+		Select(`"to" as peer, COUNT(*) as message_count, MAX(created_at) as last_time`).
+		Where("type = ?", models.MessageTypeOutgoing).
+		Group(`"to"`).
+		Having(`"to" != ''`).
+		Find(&outgoingSummaries).Error; err != nil {
+		return nil, fmt.Errorf("获取发送消息统计失败: %w", err)
+	}
+
+	// 合并统计结果
+	peerMap := make(map[string]*Conversation)
+	for _, s := range incomingSummaries {
+		peerMap[s.Peer] = &Conversation{
+			Peer:         s.Peer,
+			MessageCount: s.MessageCount,
+		}
+	}
+	for _, s := range outgoingSummaries {
+		if conv, exists := peerMap[s.Peer]; exists {
+			conv.MessageCount += s.MessageCount
 		} else {
-			peer = msg.To
-		}
-
-		if peer == "" {
-			continue
-		}
-
-		// 如果会话不存在，创建新会话
-		if _, exists := conversationMap[peer]; !exists {
-			conversationMap[peer] = &Conversation{
-				Peer:         peer,
-				LastMessage:  msg,
-				MessageCount: 0,
-				UnreadCount:  0,
+			peerMap[s.Peer] = &Conversation{
+				Peer:         s.Peer,
+				MessageCount: s.MessageCount,
 			}
 		}
-
-		// 更新消息数量
-		conversationMap[peer].MessageCount++
-
-		// 更新最后一条消息（取最新的）
-		if msg.CreatedAt > conversationMap[peer].LastMessage.CreatedAt {
-			conversationMap[peer].LastMessage = msg
-		}
 	}
 
-	// 转换为切片并按最后消息时间排序
-	conversations := make([]*Conversation, 0, len(conversationMap))
-	for _, conv := range conversationMap {
-		conversations = append(conversations, conv)
+	// 获取每个 peer 的最后一条消息
+	for peer, conv := range peerMap {
+		var lastMsg models.TextMessage
+		if err := db.Where("(type = ? AND \"from\" = ?) OR (type = ? AND \"to\" = ?)",
+			models.MessageTypeIncoming, peer,
+			models.MessageTypeOutgoing, peer,
+		).Order("created_at DESC").First(&lastMsg).Error; err != nil {
+			continue
+		}
+		conv.LastMessage = &lastMsg
+	}
+
+	// 转换为切片
+	conversations := make([]*Conversation, 0, len(peerMap))
+	for _, conv := range peerMap {
+		if conv.LastMessage != nil {
+			conversations = append(conversations, conv)
+		}
 	}
 
 	// 按最后消息时间倒序排序
-	for i := 0; i < len(conversations)-1; i++ {
-		for j := i + 1; j < len(conversations); j++ {
-			if conversations[i].LastMessage.CreatedAt < conversations[j].LastMessage.CreatedAt {
-				conversations[i], conversations[j] = conversations[j], conversations[i]
-			}
-		}
-	}
+	sort.Slice(conversations, func(i, j int) bool {
+		return conversations[i].LastMessage.CreatedAt > conversations[j].LastMessage.CreatedAt
+	})
 
 	return conversations, nil
 }

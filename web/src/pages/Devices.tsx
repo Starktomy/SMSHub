@@ -25,17 +25,19 @@ import {
     Plus,
     RefreshCw,
     Plane,
-    RotateCcw,
     Trash2,
     Wifi,
     Search,
+    Settings,
 } from 'lucide-react';
 
 import { SignalStrength } from '@/components/SignalStrength';
+import { DeviceControlPanel } from '@/components/DeviceControlPanel';
 
 export default function Devices() {
     const queryClient = useQueryClient();
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
     const [editingDevice, setEditingDevice] = useState<Device | null>(null);
     const [formData, setFormData] = useState<CreateDeviceRequest>({
         name: '',
@@ -48,7 +50,7 @@ export default function Devices() {
     const {data: devices, isLoading, refetch} = useQuery({
         queryKey: ['devices'],
         queryFn: devicesApi.list,
-        refetchInterval: 10000,
+        refetchInterval: 5000,
     });
 
     // 扫描串口
@@ -118,30 +120,6 @@ export default function Devices() {
         },
         onError: () => {
             toast.error('操作失败');
-        },
-    });
-
-    // 设置飞行模式
-    const flymodeMutation = useMutation({
-        mutationFn: ({id, enabled}: {id: string; enabled: boolean}) =>
-            devicesApi.setFlymode(id, enabled),
-        onSuccess: () => {
-            toast.success('飞行模式设置成功');
-            queryClient.invalidateQueries({queryKey: ['devices']});
-        },
-        onError: () => {
-            toast.error('设置飞行模式失败');
-        },
-    });
-
-    // 重启设备
-    const rebootMutation = useMutation({
-        mutationFn: devicesApi.reboot,
-        onSuccess: () => {
-            toast.success('重启命令已发送');
-        },
-        onError: () => {
-            toast.error('重启失败');
         },
     });
 
@@ -383,30 +361,10 @@ export default function Devices() {
                                         variant="ghost"
                                         size="icon"
                                         className="h-8 w-8"
-                                        onClick={() =>
-                                            flymodeMutation.mutate({
-                                                id: device.id,
-                                                enabled: !device.flymode,
-                                            })
-                                        }
-                                        disabled={device.status !== 'online'}
-                                        title={device.flymode ? '关闭飞行模式' : '开启飞行模式'}
+                                        onClick={() => setSelectedDevice(device)}
+                                        title="设备控制"
                                     >
-                                        <Plane
-                                            className={`w-4 h-4 ${
-                                                device.flymode ? 'text-orange-500' : ''
-                                            }`}
-                                        />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => rebootMutation.mutate(device.id)}
-                                        disabled={device.status !== 'online'}
-                                        title="重启设备"
-                                    >
-                                        <RotateCcw className="w-4 h-4" />
+                                        <Settings className="w-4 h-4" />
                                     </Button>
                                     <Button
                                         variant="ghost"
@@ -446,6 +404,20 @@ export default function Devices() {
                     </Button>
                 </Card>
             )}
+            {/* 设备控制弹窗 */}
+            <Dialog open={!!selectedDevice} onOpenChange={(open) => !open && setSelectedDevice(null)}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>设备控制 - {selectedDevice?.name || selectedDevice?.serialPort}</DialogTitle>
+                    </DialogHeader>
+                    {selectedDevice && (
+                        <DeviceControlPanel
+                            device={devices?.find(d => d.id === selectedDevice.id) || selectedDevice}
+                            onClose={() => setSelectedDevice(null)}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

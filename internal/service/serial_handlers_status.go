@@ -38,6 +38,10 @@ func (s *SerialService) handleStatusResponse(msg *ParsedMessage) {
 		s.logger.Error("JSON解析失败", zap.Error(err), zap.String("data", msg.JSON))
 		return
 	}
+
+	// 更新内存中的飞行模式状态
+	s.flyMode.Store(statusData.Flymode)
+
 	imsi := statusData.Mobile.Imsi
 	if len(imsi) > 5 {
 		plmn := imsi[:5]

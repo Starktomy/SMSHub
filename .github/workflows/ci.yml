@@ -1,0 +1,63 @@
+name: CI - Test & Lint
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+
+jobs:
+  test-backend:
+    name: Backend Test (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Create dummy frontend assets
+        run: |
+          mkdir -p web/dist
+          touch web/dist/index.html
+
+      - name: Run Unit Tests
+        run: go test -v ./internal/...
+
+  test-frontend:
+    name: Frontend Test (React)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install Dependencies
+        run: |
+          cd web
+          npm ci
+
+      - name: Run Lint
+        run: |
+          cd web
+          npm run lint
+
+      - name: Run Vitest
+        run: |
+          cd web
+          npx vitest run

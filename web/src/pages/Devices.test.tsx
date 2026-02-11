@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import Devices from '../pages/Devices';
 import { devicesApi } from '@/api/devices';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -56,8 +56,8 @@ describe('Devices Page', () => {
       },
     ];
 
-    (devicesApi.list as any).mockResolvedValue(mockDevices);
-    (devicesApi.discover as any).mockResolvedValue({ ports: [] });
+    (devicesApi.list as Mock).mockResolvedValue(mockDevices);
+    (devicesApi.discover as Mock).mockResolvedValue({ ports: [] });
 
     render(
       <QueryClientProvider client={createTestQueryClient()}>
@@ -74,8 +74,8 @@ describe('Devices Page', () => {
   });
 
   it('opens add device dialog when clicking add button', async () => {
-    (devicesApi.list as any).mockResolvedValue([]);
-    (devicesApi.discover as any).mockResolvedValue({ ports: ['/dev/ttyUSB0'] });
+    (devicesApi.list as Mock).mockResolvedValue([]);
+    (devicesApi.discover as Mock).mockResolvedValue({ ports: ['/dev/ttyUSB0'] });
 
     render(
       <QueryClientProvider client={createTestQueryClient()}>

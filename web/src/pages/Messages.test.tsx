@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import Messages from '../pages/Messages';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as messagesApi from '../api/messages';
@@ -59,9 +59,9 @@ describe('Messages Page', () => {
       },
     ];
 
-    (messagesApi.getConversations as any).mockResolvedValue(mockConversations);
-    (messagesApi.getConversationMessages as any).mockResolvedValue([]);
-    (devicesApi.list as any).mockResolvedValue([]);
+    (messagesApi.getConversations as Mock).mockResolvedValue(mockConversations);
+    (messagesApi.getConversationMessages as Mock).mockResolvedValue([]);
+    (devicesApi.list as Mock).mockResolvedValue([]);
 
     render(
       <QueryClientProvider client={createTestQueryClient()}>
@@ -92,10 +92,10 @@ describe('Messages Page', () => {
       },
     ];
 
-    (messagesApi.getConversations as any).mockResolvedValue(mockConversations);
-    (messagesApi.getConversationMessages as any).mockResolvedValue([]);
-    (devicesApi.list as any).mockResolvedValue([]);
-    (devicesApi.autoSendSMS as any).mockResolvedValue({});
+    (messagesApi.getConversations as Mock).mockResolvedValue(mockConversations);
+    (messagesApi.getConversationMessages as Mock).mockResolvedValue([]);
+    (devicesApi.list as Mock).mockResolvedValue([]);
+    (devicesApi.autoSendSMS as Mock).mockResolvedValue({});
 
     render(
       <QueryClientProvider client={createTestQueryClient()}>

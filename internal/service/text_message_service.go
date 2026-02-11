@@ -136,20 +136,20 @@ func (s *TextMessageService) GetConversations(ctx context.Context) ([]*Conversat
 
 	var incomingSummaries []peerSummary
 	if err := db.Model(&models.TextMessage{}).
-		Select(`"from" as peer, COUNT(*) as message_count, MAX(created_at) as last_time`).
+		Select(`from_number as peer, COUNT(*) as message_count, MAX(created_at) as last_time`).
 		Where("type = ?", models.MessageTypeIncoming).
-		Group(`"from"`).
-		Having(`"from" != ''`).
+		Group(`from_number`).
+		Having(`from_number != ''`).
 		Find(&incomingSummaries).Error; err != nil {
 		return nil, fmt.Errorf("获取接收消息统计失败: %w", err)
 	}
 
 	var outgoingSummaries []peerSummary
 	if err := db.Model(&models.TextMessage{}).
-		Select(`"to" as peer, COUNT(*) as message_count, MAX(created_at) as last_time`).
+		Select(`to_number as peer, COUNT(*) as message_count, MAX(created_at) as last_time`).
 		Where("type = ?", models.MessageTypeOutgoing).
-		Group(`"to"`).
-		Having(`"to" != ''`).
+		Group(`to_number`).
+		Having(`to_number != ''`).
 		Find(&outgoingSummaries).Error; err != nil {
 		return nil, fmt.Errorf("获取发送消息统计失败: %w", err)
 	}
@@ -176,13 +176,15 @@ func (s *TextMessageService) GetConversations(ctx context.Context) ([]*Conversat
 	// 获取每个 peer 的最后一条消息
 	for peer, conv := range peerMap {
 		var lastMsg models.TextMessage
-		if err := db.Where("(type = ? AND \"from\" = ?) OR (type = ? AND \"to\" = ?)",
+		if err := db.Where("(type = ? AND from_number = ?) OR (type = ? AND to_number = ?)",
 			models.MessageTypeIncoming, peer,
 			models.MessageTypeOutgoing, peer,
 		).Order("created_at DESC").First(&lastMsg).Error; err != nil {
 			continue
 		}
 		conv.LastMessage = &lastMsg
+		conv.UnreadCount = 0 // 暂时不实现未读计数
+		peerMap[peer] = conv
 	}
 
 	// 转换为切片
@@ -207,8 +209,8 @@ func (s *TextMessageService) GetConversationMessages(ctx context.Context, peer s
 
 	var messages []models.TextMessage
 
-	// 查询条件：(type=incoming AND from=peer) OR (type=outgoing AND to=peer)
-	if err := db.Where("(type = ? AND \"from\" = ?) OR (type = ? AND \"to\" = ?)",
+	// 查询条件：(type=incoming AND from_number=peer) OR (type=outgoing AND to_number=peer)
+	if err := db.Where("(type = ? AND from_number = ?) OR (type = ? AND to_number = ?)",
 		models.MessageTypeIncoming, peer,
 		models.MessageTypeOutgoing, peer,
 	).Order("created_at ASC").Find(&messages).Error; err != nil {
@@ -223,8 +225,8 @@ func (s *TextMessageService) GetConversationMessages(ctx context.Context, peer s
 func (s *TextMessageService) DeleteConversation(ctx context.Context, peer string) error {
 	db := s.repo.GetDB(ctx)
 
-	// 删除条件：(type=incoming AND from=peer) OR (type=outgoing AND to=peer)
-	result := db.Where("(type = ? AND \"from\" = ?) OR (type = ? AND \"to\" = ?)",
+	// 删除条件：(type=incoming AND from_number=peer) OR (type=outgoing AND to_number=peer)
+	result := db.Where("(type = ? AND from_number = ?) OR (type = ? AND to_number = ?)",
 		models.MessageTypeIncoming, peer,
 		models.MessageTypeOutgoing, peer,
 	).Delete(&models.TextMessage{})

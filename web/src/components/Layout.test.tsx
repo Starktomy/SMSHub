@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import Layout from './Layout';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { devicesApi } from '@/api/devices';
@@ -38,8 +38,8 @@ describe('Layout Component', () => {
   });
 
   it('renders navigation items', async () => {
-    (devicesApi.list as any).mockResolvedValue([]);
-    (getVersion as any).mockResolvedValue({ version: '1.0.0' });
+    (devicesApi.list as Mock).mockResolvedValue([]);
+    (getVersion as Mock).mockResolvedValue({ version: '1.0.0' });
 
     render(
       <QueryClientProvider client={createTestQueryClient()}>
@@ -65,8 +65,8 @@ describe('Layout Component', () => {
       { id: '2', status: 'offline' },
     ];
 
-    (devicesApi.list as any).mockResolvedValue(mockDevices);
-    (getVersion as any).mockResolvedValue({ version: '1.0.0' });
+    (devicesApi.list as Mock).mockResolvedValue(mockDevices);
+    (getVersion as Mock).mockResolvedValue({ version: '1.0.0' });
 
     render(
       <QueryClientProvider client={createTestQueryClient()}>
@@ -86,10 +86,10 @@ describe('Layout Component', () => {
   });
 
   it('handles logout', async () => {
-    (devicesApi.list as any).mockResolvedValue([]);
-    (getVersion as any).mockResolvedValue({ version: '1.0.0' });
+    (devicesApi.list as Mock).mockResolvedValue([]);
+    (getVersion as Mock).mockResolvedValue({ version: '1.0.0' });
 
-    const { getByText } = render(
+    render(
       <QueryClientProvider client={createTestQueryClient()}>
         <MemoryRouter>
           <Layout />

@@ -65,8 +65,20 @@ class ApiClient {
 
             // 处理错误响应
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || `HTTP ${response.status}: ${response.statusText}`);
+                let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                try {
+                    const errorJson = await response.json();
+                    if (errorJson && errorJson.error) {
+                        errorMessage = errorJson.error;
+                    } else if (errorJson && errorJson.message) {
+                        errorMessage = errorJson.message;
+                    }
+                } catch (e) {
+                    // 如果不是 JSON，尝试获取文本
+                    const errorText = await response.text();
+                    if (errorText) errorMessage = errorText;
+                }
+                throw new Error(errorMessage);
             }
 
             // 解析 JSON 响应

@@ -12,6 +12,7 @@ interface EmailConfigProps {
   from: string;
   to: string;
   subject: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onUpdate: (field: string, value: any) => void;
   onTest: () => void;
   isTestPending: boolean;

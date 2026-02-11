@@ -60,8 +60,6 @@ export default function ScheduledTasksConfig() {
         queryFn: devicesApi.list,
     });
 
-    const onlineDevices = devices.filter(d => d.status === 'online');
-
     // 获取设备名称
     const getDeviceName = (deviceId?: string) => {
         if (!deviceId || deviceId === 'auto') return '自动选择';
@@ -112,6 +110,7 @@ export default function ScheduledTasksConfig() {
             resetForm();
             toast.success('任务创建成功');
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: (error: any) => {
             console.error('创建任务失败:', error);
             toast.error(error.response?.data?.error || '创建任务失败');
@@ -129,6 +128,7 @@ export default function ScheduledTasksConfig() {
             resetForm();
             toast.success('任务更新成功');
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: (error: any) => {
             console.error('更新任务失败:', error);
             toast.error(error.response?.data?.error || '更新任务失败');
@@ -142,6 +142,7 @@ export default function ScheduledTasksConfig() {
             queryClient.invalidateQueries({queryKey: ['scheduledTasks']});
             toast.success('任务删除成功');
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: (error: any) => {
             console.error('删除任务失败:', error);
             toast.error(error.response?.data?.error || '删除任务失败');
@@ -155,6 +156,7 @@ export default function ScheduledTasksConfig() {
             queryClient.invalidateQueries({queryKey: ['scheduledTasks']});
             toast.success('任务已触发执行');
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: (error: any) => {
             console.error('触发任务失败:', error);
             toast.error(error.response?.data?.error || '触发任务失败');
@@ -195,6 +197,7 @@ export default function ScheduledTasksConfig() {
     };
 
     // 更新表单字段
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateFormField = (field: keyof TaskFormData, value: any) => {
         setFormData({
             ...formData,

@@ -12,6 +12,7 @@ interface WebhookConfigProps {
   contentType: string;
   headers: string;
   body: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onUpdate: (field: string, value: any) => void;
   onTest: () => void;
   isTestPending: boolean;

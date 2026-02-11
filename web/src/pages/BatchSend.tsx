@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import {useQuery, useMutation} from '@tanstack/react-query';
 import {devicesApi} from '@/api/devices';
-import type {Device, BatchSendRequest, BatchSendResult} from '@/api/devices';
+import type {BatchSendRequest, BatchSendResult} from '@/api/devices';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
 import {Textarea} from '@/components/ui/textarea';

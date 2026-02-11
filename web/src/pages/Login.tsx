@@ -59,7 +59,7 @@ export default function Login() {
             const {authUrl} = await getOIDCAuthURL();
             // 跳转到 OIDC 认证页面
             window.location.href = authUrl;
-        } catch (error) {
+        } catch {
             toast.error('获取 OIDC 认证 URL 失败');
             setLoading(false);
         }

@@ -24,15 +24,10 @@ import {toast} from 'sonner';
 import {
     Plus,
     RefreshCw,
-    Signal,
-    Power,
-    PowerOff,
     Plane,
     RotateCcw,
     Trash2,
-    Edit,
     Wifi,
-    WifiOff,
     Search,
 } from 'lucide-react';
 
@@ -82,6 +77,7 @@ export default function Devices() {
             setFormData({name: '', serialPort: '', groupName: '', enabled: true});
             queryClient.invalidateQueries({queryKey: ['devices']});
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: (error: any) => {
             toast.error(error?.message || '添加设备失败');
         },

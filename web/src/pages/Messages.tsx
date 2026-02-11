@@ -150,6 +150,7 @@ export default function Messages() {
     // 自动选择第一个会话
     useEffect(() => {
         if (!selectedPeer && conversations.length > 0) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setSelectedPeer(conversations[0].peer);
         }
     }, [conversations, selectedPeer]);

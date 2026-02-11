@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 interface WecomConfigProps {
   enabled: boolean;
   secretKey: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onUpdate: (field: string, value: any) => void;
   onTest: () => void;
   isTestPending: boolean;

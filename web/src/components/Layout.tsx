@@ -38,7 +38,6 @@ export default function Layout() {
     // 统计在线设备
     const onlineCount = devices.filter(d => d.status === 'online').length;
     const totalCount = devices.length;
-    const isAllOffline = totalCount > 0 && onlineCount === 0;
 
     const isActive = (path: string) => {
         if (path === '/') {

@@ -174,9 +174,11 @@ export default function NotificationChannels() {
 
             setFormValues(newFormValues);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [channels]);
 
     // 更新表单字段
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateField = (field: keyof FormValues, value: any) => {
         setFormValues((prev) => ({...prev, [field]: value}));
     };
@@ -227,6 +229,7 @@ export default function NotificationChannels() {
                 try {
                     headers = JSON.parse(formValues.webhookHeaders);
                 } catch (err) {
+                    console.error('Webhook Headers Parse Error', err);
                     toast.error('Webhook Headers JSON 格式错误');
                     return;
                 }

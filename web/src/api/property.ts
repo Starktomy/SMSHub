@@ -31,6 +31,7 @@ const PROPERTY_ID_NOTIFICATION_CHANNELS = 'notification_channels';
 export interface NotificationChannel {
     type: 'dingtalk' | 'wecom' | 'feishu' | 'email' | 'webhook' | 'telegram'; // 渠道类型，作为唯一标识
     enabled: boolean; // 是否启用
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     config: Record<string, any>; // JSON配置，根据type不同而不同
 }
 

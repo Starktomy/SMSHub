@@ -3,6 +3,7 @@
 const BASE_URL = '/api';
 
 interface RequestOptions extends RequestInit {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     params?: Record<string, any>;
 }
 
@@ -13,6 +14,7 @@ class ApiClient {
         this.baseURL = baseURL;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private buildURL(path: string, params?: Record<string, any>): string {
         const url = new URL(this.baseURL + path, window.location.origin);
 
@@ -73,7 +75,7 @@ class ApiClient {
                     } else if (errorJson && errorJson.message) {
                         errorMessage = errorJson.message;
                     }
-                } catch (e) {
+                } catch {
                     // 如果不是 JSON，尝试获取文本
                     const errorText = await response.text();
                     if (errorText) errorMessage = errorText;
@@ -94,6 +96,7 @@ class ApiClient {
         return this.request<T>(path, {...options, method: 'GET'});
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async post<T>(path: string, data?: any, options?: RequestOptions): Promise<T> {
         return this.request<T>(path, {
             ...options,
@@ -102,6 +105,7 @@ class ApiClient {
         });
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async put<T>(path: string, data?: any, options?: RequestOptions): Promise<T> {
         return this.request<T>(path, {
             ...options,

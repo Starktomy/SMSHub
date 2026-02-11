@@ -16,7 +16,6 @@ import {
 import {devicesApi} from '@/api/devices';
 import type {Device} from '@/api/devices';
 import { SignalStrength } from '@/components/SignalStrength';
-import {formatUptime} from "@/utils/utils.ts";
 
 export default function SerialControl() {
     const [to, setTo] = useState('');

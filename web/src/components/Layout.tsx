@@ -1,5 +1,5 @@
 import {Link, Outlet, useLocation, useNavigate} from 'react-router-dom';
-import {Bell, Clock, LayoutDashboard, LogOut, MessageSquare, Smartphone, Send, Router} from 'lucide-react';
+import {Bell, Clock, LayoutDashboard, LogOut, MessageSquare, Send, Router} from 'lucide-react';
 import {Button} from "@/components/ui/button.tsx";
 import {useQuery} from "@tanstack/react-query";
 import {getVersion} from "@/api/property.ts";
@@ -16,7 +16,6 @@ export default function Layout() {
         {name: '统计面板', href: '/', icon: LayoutDashboard},
         {name: '短信记录', href: '/messages', icon: MessageSquare},
         {name: '设备管理', href: '/devices', icon: Router},
-        {name: '串口控制', href: '/serial', icon: Smartphone},
         {name: '批量发送', href: '/batch-send', icon: Send},
         {name: '通知渠道', href: '/notifications', icon: Bell},
         {name: '计划任务', href: '/scheduled-tasks', icon: Clock},

@@ -11,7 +11,6 @@ const Login = lazy(() => import('./pages/Login'));
 const OIDCCallback = lazy(() => import('./pages/OIDCCallback'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Messages = lazy(() => import('./pages/Messages'));
-const SerialControl = lazy(() => import('./pages/SerialControl'));
 const NotificationChannels = lazy(() => import('./pages/NotificationChannels'));
 const ScheduledTasksConfig = lazy(() => import('./pages/ScheduledTasksConfig'));
 const Devices = lazy(() => import('./pages/Devices'));
@@ -48,7 +47,6 @@ function App() {
                                 <Route index element={<Dashboard/>}/>
                                 <Route path="messages" element={<Messages/>}/>
                                 <Route path="devices" element={<Devices/>}/>
-                                <Route path="serial" element={<SerialControl/>}/>
                                 <Route path="batch-send" element={<BatchSend/>}/>
                                 <Route path="notifications" element={<NotificationChannels/>}/>
                                 <Route path="scheduled-tasks" element={<ScheduledTasksConfig/>}/>

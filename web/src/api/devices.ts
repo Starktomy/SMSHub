@@ -6,6 +6,8 @@ export interface Device {
   serialPort: string;
   status: 'online' | 'offline' | 'error';
   phoneNumber: string;
+  imsi: string;
+  iccid: string;
   operator: string;
   signalLevel: number;
   flymode: boolean;
@@ -28,6 +30,7 @@ export interface UpdateDeviceRequest {
   serialPort: string;
   groupName?: string;
   enabled?: boolean;
+  phoneNumber?: string;
 }
 
 export interface BatchSendRequest {

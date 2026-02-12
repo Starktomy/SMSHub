@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import Devices from '../pages/Devices';
 import { devicesApi } from '@/api/devices';
@@ -65,8 +65,10 @@ describe('Devices Page', () => {
       </QueryClientProvider>
     );
 
-    // Wait for loading spinner to be removed
-    await waitForElementToBeRemoved(() => screen.queryByTestId('loading-spinner'));
+    // Wait for data to be loaded
+    await waitFor(() => {
+        expect(screen.getByText('Test Device')).toBeInTheDocument();
+    });
 
     expect(screen.getByText('设备管理')).toBeInTheDocument();
     expect(screen.getByText('Test Device')).toBeInTheDocument();
@@ -83,8 +85,10 @@ describe('Devices Page', () => {
       </QueryClientProvider>
     );
 
-    // Wait for loading spinner to be removed
-    await waitForElementToBeRemoved(() => screen.queryByTestId('loading-spinner'));
+    // Wait for rendering
+    await waitFor(() => {
+        expect(screen.getByText('设备管理')).toBeInTheDocument();
+    });
 
     // There might be multiple "添加设备" buttons (header and empty state), click the first one
     const addButtons = screen.getAllByText('添加设备');
@@ -92,7 +96,7 @@ describe('Devices Page', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByText('扫描串口')).toBeInTheDocument();
+      expect(screen.getByText('设备名称')).toBeInTheDocument();
     });
   });
 });

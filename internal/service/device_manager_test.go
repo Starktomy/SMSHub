@@ -1,11 +1,14 @@
 package service
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/Starktomy/smshub/internal/models"
+	"github.com/Starktomy/smshub/internal/repo"
+	"go.uber.org/zap"
 )
 
 func TestDeviceManagerSelectRoundRobin(t *testing.T) {
@@ -197,5 +200,50 @@ func TestHeartbeatConstants(t *testing.T) {
 	}
 	if HealthCheckInterval != 10*time.Second {
 		t.Errorf("HealthCheckInterval 应为 10s，实际为 %v", HealthCheckInterval)
+	}
+}
+
+func TestDeviceManager_UpdateDevice_PhoneNumber(t *testing.T) {
+	db := setupTestDB(t)
+	deviceRepo := repo.NewDeviceRepo(db)
+	dm := NewDeviceManager(zap.NewExample(), deviceRepo, nil, nil, nil)
+	ctx := context.Background()
+
+	// 1. 创建初始设备
+	device := &models.Device{
+		Name:        "Original Name",
+		SerialPort:  "/dev/ttyUSB99",
+		Enabled:     true,
+		PhoneNumber: "13800000000",
+	}
+	if err := dm.CreateDevice(ctx, device); err != nil {
+		t.Fatalf("CreateDevice failed: %v", err)
+	}
+	// CreateDevice 会生成新的 ID，必须使用该 ID 进行后续操作
+	id := device.ID
+
+	// 2. 更新设备 (修改名称和手机号)
+	updateReq := &models.Device{
+		ID:          id,
+		Name:        "Updated Name",
+		SerialPort:  "/dev/ttyUSB99",
+		Enabled:     true,
+		PhoneNumber: "13900000000",
+	}
+	if err := dm.UpdateDevice(ctx, updateReq); err != nil {
+		t.Fatalf("UpdateDevice failed: %v", err)
+	}
+
+	// 3. 验证更新结果
+	updated, err := dm.GetDevice(ctx, id)
+	if err != nil {
+		t.Fatalf("GetDevice failed: %v", err)
+	}
+
+	if updated.Name != "Updated Name" {
+		t.Errorf("Name mismatch: expected 'Updated Name', got '%s'", updated.Name)
+	}
+	if updated.PhoneNumber != "13900000000" {
+		t.Errorf("PhoneNumber mismatch: expected '13900000000', got '%s'", updated.PhoneNumber)
 	}
 }

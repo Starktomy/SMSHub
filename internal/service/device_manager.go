@@ -230,6 +230,9 @@ func (dm *DeviceManager) updateDeviceStatus(deviceID string, status *StatusData)
 		if status.Mobile.Operator != "" {
 			columns["operator"] = status.Mobile.Operator
 		}
+		if status.Mobile.SimOperator != "" {
+			columns["sim_operator"] = status.Mobile.SimOperator
+		}
 
 		// 业务数据更新
 		columns["signal_level"] = status.Mobile.SignalLevel

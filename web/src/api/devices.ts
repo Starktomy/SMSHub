@@ -9,6 +9,7 @@ export interface Device {
   imsi: string;
   iccid: string;
   operator: string;
+  simOperator: string;
   signalLevel: number;
   flymode: boolean;
   enabled: boolean;

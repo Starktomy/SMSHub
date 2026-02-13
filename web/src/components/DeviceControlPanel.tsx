@@ -168,7 +168,7 @@ export function DeviceControlPanel({ device }: DeviceControlPanelProps) {
                                 </span>
                             </div>
                             <div className="flex justify-between items-center pb-3 border-b border-gray-200">
-                                <span className="text-sm font-medium text-gray-500">运营商</span>
+                                <span className="text-sm font-medium text-gray-500">当前运营商</span>
                                 <span className="text-sm font-medium">
                                     {device.operator || '未知'}
                                 </span>
@@ -182,9 +182,16 @@ export function DeviceControlPanel({ device }: DeviceControlPanelProps) {
                             </div>
                             <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                                 <span className="text-sm font-medium text-gray-500">IMSI</span>
-                                <span className="text-sm font-mono font-medium">
-                                    {device.imsi || '未知'}
-                                </span>
+                                <div className="flex flex-col items-end">
+                                    <span className="text-sm font-mono font-medium">
+                                        {device.imsi || '未知'}
+                                    </span>
+                                    {device.simOperator && (
+                                        <span className="text-[10px] text-gray-400 font-medium">
+                                            归属: {device.simOperator}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                                 <span className="text-sm font-medium text-gray-500">ICCID</span>

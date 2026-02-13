@@ -19,14 +19,16 @@ type StatusData struct {
 		SignalLevel  int     `json:"signal_level"`
 		SimReady     bool    `json:"sim_ready"`
 		Rssi         int     `json:"rssi"`
-		Csq          int     `json:"csq"`      // CSQ 信号强度 (0-31)
-		Rsrp         int     `json:"rsrp"`     // 参考信号接收功率 (-44 到 -140)
-		Rsrq         float64 `json:"rsrq"`     // 参考信号发送功率 (-3 到 -19.5)
-		Imsi         string  `json:"imsi"`     // SIM 卡 IMSI
-		Number       string  `json:"number"`   // 手机号
-		Operator     string  `json:"operator"` // 运营商名称
-		Uptime       int64   `json:"uptime"`   // 模块开机时长，单位为秒
-		Flymode      bool    `json:"flymode"`  // 飞行模式状态
+		Csq          int     `json:"csq"`          // CSQ 信号强度 (0-31)
+		Rsrp         int     `json:"rsrp"`         // 参考信号接收功率 (-44 到 -140)
+		Rsrq         float64 `json:"rsrq"`         // 参考信号发送功率 (-3 到 -19.5)
+		Imsi         string  `json:"imsi"`         // SIM 卡 IMSI
+		Number       string  `json:"number"`       // 手机号
+		Operator     string  `json:"operator"`     // 运营商名称 (当前网络)
+		SimOperator  string  `json:"sim_operator"` // 运营商名称 (SIM卡归属)
+		Mnc          string  `json:"mnc"`          // 实时网络 MNC/PLMN (来自 Lua)
+		Uptime       int64   `json:"uptime"`       // 模块开机时长，单位为秒
+		Flymode      bool    `json:"flymode"`      // 飞行模式状态
 	} `json:"mobile"`
 	Timestamp int    `json:"timestamp"`
 	MemKb     int    `json:"mem_kb"`
@@ -50,15 +52,35 @@ func (s *SerialService) handleStatusResponse(msg *ParsedMessage) {
 	statusData.Iccid = statusData.Mobile.Iccid
 
 	// 3. 处理运营商
-	imsi := statusData.Mobile.Imsi
-	if len(imsi) > 5 {
-		plmn := imsi[:5]
-		statusData.Mobile.Operator = func() string {
-			if v, ok := OperData[plmn]; ok {
+	// (A) SIM卡归属运营商 - 基于 IMSI
+	if len(statusData.Mobile.Imsi) > 5 {
+		simPlmn := statusData.Mobile.Imsi[:5]
+		statusData.Mobile.SimOperator = func() string {
+			if v, ok := OperData[simPlmn]; ok {
 				return v
 			}
-			return plmn
+			return simPlmn
 		}()
+	}
+
+	// (B) 实时网络运营商 - 基于基站 MNC (Lua提供)
+	if statusData.Mobile.Mnc != "" {
+		netPlmn := statusData.Mobile.Mnc
+		statusData.Mobile.Operator = func() string {
+			if v, ok := OperData[netPlmn]; ok {
+				return v
+			}
+			// 尝试前 5 位匹配 (处理 3 位 MNC 的情况)
+			if len(netPlmn) > 5 {
+				if v, ok := OperData[netPlmn[:5]]; ok {
+					return v
+				}
+			}
+			return netPlmn
+		}()
+	} else {
+		// 如果没有实时基站信息，则 Operator 显示为与 SIM 卡一致
+		statusData.Mobile.Operator = statusData.Mobile.SimOperator
 	}
 
 	s.deviceCache.Set(CacheKeyDeviceStatus, &statusData, CacheTTL)

@@ -374,12 +374,6 @@ export function DeviceControlPanel({ device }: DeviceControlPanelProps) {
                                         : '-'}
                                 </span>
                             </div>
-                            <div className="flex justify-between items-center pb-3 border-b border-gray-200">
-                                <span className="text-sm font-medium text-gray-500">飞行模式</span>
-                                <span className={`text-sm font-medium ${flymodeStatus.color}`}>
-                                    {flymodeStatus.text}
-                                </span>
-                            </div>
                         </div>
                     </CardContent>
                 </Card>

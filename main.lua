@@ -93,16 +93,20 @@ function get_mobile_info()
     info.is_roaming = net_stat == 5
     info.uptime = mcu.ticks2() -- 单位为秒
 
-    -- 获取实时网络信息 (MCC/MNC/LAC/CellID)
-    local net_info = mobile.getNetInfo()
-    if net_info and net_info.mcc and net_info.mnc then
-        local mcc_str = string.format("%03X", net_info.mcc)
-        local mnc_str = string.format("%02X", net_info.mnc)
+    -- 获取更详细的服务小区信息 (LAC/CID/MNC/MCC)
+    local scell = mobile.scell()
+    if scell and scell.mcc and scell.mnc then
+        -- 统一 MNC/MCC 处理 (使用十进制格式化，确保 460 显示为 460 而不是 1CC)
+        local mcc_str = string.format("%03d", scell.mcc)
+        local mnc_str = string.format("%02d", scell.mnc)
         info.mnc = mcc_str .. mnc_str
         
-        -- 增加 LAC (或 TAC) 和 CellID
-        info.lac = net_info.lac or net_info.tac or 0
-        info.cid = net_info.cellid or 0
+        info.lac = scell.tac or 0
+        info.cid = scell.cid or scell.eci or 0
+        
+        -- 同步更新信号质量（如果 scell 提供了更准的）
+        if scell.rsrp then info.rsrp = scell.rsrp end
+        if scell.rsrq then info.rsrq = scell.rsrq end
     end
 
     -- https://docs.openluat.com/osapi/core/mobile/#mobileflymodeindex-enable

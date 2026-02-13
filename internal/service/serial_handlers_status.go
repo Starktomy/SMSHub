@@ -7,9 +7,10 @@ import (
 )
 
 type StatusData struct {
-	Flymode bool   `json:"flymode"` // 设备当前是否为飞行模式
+	Flymode bool   `json:"flymode"` // 兼容性保留（根级别）
 	Type    string `json:"type"`    // 消息类型
 	Version string `json:"version"` // Lua 脚本版本
+	Iccid   string `json:"iccid"`   // 兼容性保留（根级别）
 	Mobile  struct {
 		IsRegistered bool    `json:"is_registered"`
 		IsRoaming    bool    `json:"is_roaming"`
@@ -25,6 +26,7 @@ type StatusData struct {
 		Number       string  `json:"number"`   // 手机号
 		Operator     string  `json:"operator"` // 运营商名称
 		Uptime       int64   `json:"uptime"`   // 模块开机时长，单位为秒
+		Flymode      bool    `json:"flymode"`  // 飞行模式状态
 	} `json:"mobile"`
 	Timestamp int    `json:"timestamp"`
 	MemKb     int    `json:"mem_kb"`
@@ -39,9 +41,15 @@ func (s *SerialService) handleStatusResponse(msg *ParsedMessage) {
 		return
 	}
 
-	// 更新内存中的飞行模式状态
-	s.flyMode.Store(statusData.Flymode)
+	// 1. 处理飞行模式（逻辑取反：硬件返回 true 代表关闭）
+	realFlymode := !statusData.Mobile.Flymode
+	s.flyMode.Store(realFlymode)
+	statusData.Flymode = realFlymode
 
+	// 2. 处理 ICCID（直接从 mobile 中提取，不进行复杂保护）
+	statusData.Iccid = statusData.Mobile.Iccid
+
+	// 3. 处理运营商
 	imsi := statusData.Mobile.Imsi
 	if len(imsi) > 5 {
 		plmn := imsi[:5]
@@ -52,6 +60,7 @@ func (s *SerialService) handleStatusResponse(msg *ParsedMessage) {
 			return plmn
 		}()
 	}
+
 	s.deviceCache.Set(CacheKeyDeviceStatus, &statusData, CacheTTL)
 	if s.statusUpdateCallback != nil {
 		s.statusUpdateCallback(&statusData)
@@ -69,6 +78,11 @@ func (s *SerialService) handleHeartbeat(msg *ParsedMessage) {
 	timestamp, _ := msg.Payload["timestamp"].(float64)
 	memoryUsage, _ := msg.Payload["memory_usage"].(float64)
 	bufferSize, _ := msg.Payload["buffer_size"].(float64)
+
+	// 触发状态更新回调，仅更新在线时间，不传递业务数据
+	if s.statusUpdateCallback != nil {
+		s.statusUpdateCallback(nil)
+	}
 
 	s.logger.Debug("设备心跳",
 		zap.Int64("timestamp", int64(timestamp)),

@@ -212,14 +212,29 @@ func (dm *DeviceManager) updateDeviceStatus(deviceID string, status *StatusData)
 	}
 
 	if status != nil {
-		columns["phone_number"] = status.Mobile.Number
-		columns["imsi"] = status.Mobile.Imsi
-		columns["iccid"] = status.Mobile.Iccid
-		columns["operator"] = status.Mobile.Operator
+		// 手机号：只有当心跳返回有值时才更新（不覆盖用户手动填写的号码）
+		if status.Mobile.Number != "" {
+			columns["phone_number"] = status.Mobile.Number
+		}
+		// IMSI：每次心跳都更新
+		if status.Mobile.Imsi != "" {
+			columns["imsi"] = status.Mobile.Imsi
+		}
+
+		// ICCID：直接提取
+		if status.Mobile.Iccid != "" {
+			columns["iccid"] = status.Mobile.Iccid
+		}
+
+		// 运营商：非空时才更新
+		if status.Mobile.Operator != "" {
+			columns["operator"] = status.Mobile.Operator
+		}
+
+		// 业务数据更新
 		columns["signal_level"] = status.Mobile.SignalLevel
 		columns["flymode"] = status.Flymode
 	}
-
 	if err := dm.repo.UpdateColumnsById(ctx, deviceID, columns); err != nil {
 		dm.logger.Error("更新设备状态失败", zap.String("id", deviceID), zap.Error(err))
 	}

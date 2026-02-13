@@ -65,13 +65,22 @@ func TestSerialService_StateManagement(t *testing.T) {
 		t.Error("Expected connected after setting port")
 	}
 
-	// Test SetFlymode
+	// Test SetFlymode - 先发送命令，然后模拟设备状态响应（真实设备格式）
 	err := svc.SetFlymode(true)
 	if err != nil {
 		t.Errorf("SetFlymode failed: %v", err)
 	}
+	// 模拟真实设备的 status_response 格式，flymode 在 mobile 字段下
+	// 注意：由于逻辑已取反，如果串口返回 flymode: false，则后端认为 FlyMode 为 true
+	simulatedResponse := `{"type":"status_response","version":"1.2.0","mobile":{"number":"","imsi":"123456789012345","uptime":308,"imei":"123456789012345","sim_ready":true,"signal_desc":"强","is_roaming":true,"is_registered":true,"flymode":false,"rsrp":-91,"rsrq":-7,"signal_level":24,"csq":24,"iccid":"12345678901234567890","rssi":-64},"timestamp":1770944358,"mem_kb":57}`
+	parsedMsg := &ParsedMessage{
+		Type: "status_response",
+		JSON: simulatedResponse,
+	}
+	svc.handleStatusResponse(parsedMsg)
+
 	if !svc.FlyMode() {
-		t.Error("Expected FlyMode true after setting")
+		t.Error("Expected FlyMode true after receiving status with flymode=false (inverted logic)")
 	}
 
 	// Test RebootMcu (should reset FlyMode)
@@ -89,29 +98,52 @@ func TestSerialService_HandleStatusResponse(t *testing.T) {
 	cfg := config.SerialConfig{Port: "/dev/ttyUSB0"}
 	svc := NewSerialService(logger, cfg, nil, nil, nil)
 
-	// Simulate receiving a status message with flymode=true
-	jsonMsg := `{"type":"status","flymode":true,"mobile":{"imsi":"460001234567890","signal_level":100}}`
+	// Simulate receiving a status message with flymode=false (真实设备格式)
+	// 由于逻辑已取反，串口返回 false 代表实际开启了飞行模式
+	jsonMsg := `{"type":"status_response","version":"1.2.0","mobile":{"number":"","imsi":"123456789012345","uptime":308,"imei":"123456789012345","sim_ready":true,"signal_desc":"强","is_roaming":true,"is_registered":true,"flymode":false,"rsrp":-91,"rsrq":-7,"signal_level":24,"csq":24,"iccid":"12345678901234567890","rssi":-64},"timestamp":1770944358,"mem_kb":57}`
 	parsedMsg := &ParsedMessage{
-		Type: "status",
+		Type: "status_response",
 		JSON: jsonMsg,
 	}
 
 	svc.handleStatusResponse(parsedMsg)
 
 	if !svc.FlyMode() {
-		t.Error("Expected FlyMode to be true after receiving status with flymode=true")
+		t.Error("Expected FlyMode to be true after receiving status with flymode=false (inverted logic)")
 	}
 
-	// Simulate receiving a status message with flymode=false
-	jsonMsg = `{"type":"status","flymode":false,"mobile":{"imsi":"460001234567890","signal_level":100}}`
+	// Simulate receiving a status message with flymode=true (真实设备格式)
+	// 由于逻辑已取反，串口返回 true 代表实际关闭了飞行模式
+	jsonMsg = `{"type":"status_response","version":"1.2.0","mobile":{"number":"","imsi":"123456789012345","uptime":318,"imei":"123456789012345","sim_ready":true,"signal_desc":"强","is_roaming":true,"is_registered":true,"flymode":true,"rsrp":-91,"rsrq":-7,"signal_level":24,"csq":24,"iccid":"12345678901234567890","rssi":-64},"timestamp":1770944368,"mem_kb":40}`
 	parsedMsg = &ParsedMessage{
-		Type: "status",
+		Type: "status_response",
 		JSON: jsonMsg,
 	}
 
 	svc.handleStatusResponse(parsedMsg)
 
 	if svc.FlyMode() {
-		t.Error("Expected FlyMode to be false after receiving status with flymode=false")
+		t.Error("Expected FlyMode to be false after receiving status with flymode=true (inverted logic)")
 	}
+}
+
+func TestSerialService_HandleHeartbeatResponse(t *testing.T) {
+	logger := zap.NewExample()
+	cfg := config.SerialConfig{Port: "/dev/ttyUSB0"}
+	svc := NewSerialService(logger, cfg, nil, nil, nil)
+
+	// 测试心跳消息处理（真实设备格式，flymode 在根级别）
+	// 由于逻辑已取反，串口返回 flymode: false 代表实际开启了飞行模式
+	heartbeatMsg := `{"signal_desc":"强","imei":"123456789012345","rssi":-64,"mem":61,"flymode":false,"type":"heartbeat","signal_level":24,"sim_ready":true,"net_reg":true}`
+	// 使用 parseSMSFrame 正确解析心跳消息，确保 Payload 字段被设置
+	parsedMsg, err := parseSMSFrame("SMS_START:" + heartbeatMsg + ":SMS_END")
+	if err != nil {
+		t.Fatalf("Failed to parse heartbeat message: %v", err)
+	}
+
+	// 先设置初始状态为 false
+	svc.flyMode.Store(false)
+	// 处理心跳消息
+	svc.handleHeartbeat(parsedMsg)
+	// 注意：根据重构逻辑，心跳包不再更新飞行模式，因此这里不再验证 flyMode 状态的变化
 }

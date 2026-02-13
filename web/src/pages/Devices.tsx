@@ -1,11 +1,11 @@
-import {useState} from 'react';
-import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query';
-import {devicesApi} from '@/api/devices';
-import type {Device, CreateDeviceRequest} from '@/api/devices';
-import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
-import {Button} from '@/components/ui/button';
-import {Input} from '@/components/ui/input';
-import {Switch} from '@/components/ui/switch';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { devicesApi } from '@/api/devices';
+import type { Device, CreateDeviceRequest } from '@/api/devices';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import {
     Dialog,
     DialogContent,
@@ -20,7 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {toast} from 'sonner';
+import { toast } from 'sonner';
 import {
     Plus,
     RefreshCw,
@@ -33,6 +33,13 @@ import {
 
 import { SignalStrength } from '@/components/SignalStrength';
 import { DeviceControlPanel } from '@/components/DeviceControlPanel';
+
+// 状态颜色映射
+const STATUS_COLORS = {
+    online: 'bg-green-500',
+    offline: 'bg-gray-400',
+    error: 'bg-red-500',
+};
 
 export default function Devices() {
     const queryClient = useQueryClient();
@@ -47,7 +54,7 @@ export default function Devices() {
     });
 
     // 获取设备列表
-    const {data: devices, isLoading, refetch} = useQuery({
+    const { data: devices, isLoading, refetch } = useQuery({
         queryKey: ['devices'],
         queryFn: devicesApi.list,
         refetchInterval: 5000,
@@ -65,7 +72,7 @@ export default function Devices() {
     });
 
     // 获取可用串口
-    const {data: discoveredPorts} = useQuery({
+    const { data: discoveredPorts } = useQuery({
         queryKey: ['discoveredPorts'],
         queryFn: devicesApi.discover,
     });
@@ -76,8 +83,8 @@ export default function Devices() {
         onSuccess: () => {
             toast.success('设备添加成功');
             setIsAddDialogOpen(false);
-            setFormData({name: '', serialPort: '', groupName: '', enabled: true});
-            queryClient.invalidateQueries({queryKey: ['devices']});
+            setFormData({ name: '', serialPort: '', groupName: '', enabled: true });
+            queryClient.invalidateQueries({ queryKey: ['devices'] });
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: (error: any) => {
@@ -87,12 +94,12 @@ export default function Devices() {
 
     // 更新设备
     const updateMutation = useMutation({
-        mutationFn: ({id, data}: {id: string; data: CreateDeviceRequest}) =>
+        mutationFn: ({ id, data }: { id: string; data: CreateDeviceRequest }) =>
             devicesApi.update(id, data),
         onSuccess: () => {
             toast.success('设备更新成功');
             setEditingDevice(null);
-            queryClient.invalidateQueries({queryKey: ['devices']});
+            queryClient.invalidateQueries({ queryKey: ['devices'] });
         },
         onError: () => {
             toast.error('更新设备失败');
@@ -104,22 +111,10 @@ export default function Devices() {
         mutationFn: devicesApi.delete,
         onSuccess: () => {
             toast.success('设备删除成功');
-            queryClient.invalidateQueries({queryKey: ['devices']});
+            queryClient.invalidateQueries({ queryKey: ['devices'] });
         },
         onError: () => {
             toast.error('删除设备失败');
-        },
-    });
-
-    // 启用/禁用设备
-    const toggleEnableMutation = useMutation({
-        mutationFn: ({id, enabled}: {id: string; enabled: boolean}) =>
-            enabled ? devicesApi.enable(id) : devicesApi.disable(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: ['devices']});
-        },
-        onError: () => {
-            toast.error('操作失败');
         },
     });
 
@@ -129,35 +124,9 @@ export default function Devices() {
             return;
         }
         if (editingDevice) {
-            updateMutation.mutate({id: editingDevice.id, data: formData});
+            updateMutation.mutate({ id: editingDevice.id, data: formData });
         } else {
             createMutation.mutate(formData);
-        }
-    };
-
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'online':
-                return 'bg-green-500';
-            case 'offline':
-                return 'bg-gray-400';
-            case 'error':
-                return 'bg-red-500';
-            default:
-                return 'bg-gray-400';
-        }
-    };
-
-    const getStatusText = (status: string) => {
-        switch (status) {
-            case 'online':
-                return '在线';
-            case 'offline':
-                return '离线';
-            case 'error':
-                return '错误';
-            default:
-                return '未知';
         }
     };
 
@@ -170,13 +139,13 @@ export default function Devices() {
     }
 
     return (
-        <div className="space-y-6">
-            {/* 头部 */}
-            <div className="flex items-center justify-between">
+        <div className="flex flex-col h-[calc(100vh-140px)]">
+            {/* 头部：保持在顶端 */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shrink-0">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">设备管理</h1>
                     <p className="text-sm text-gray-500 mt-1">
-                        管理多个 Air780 设备，支持批量操作
+                        管理多个 Air780 设备，支持实时控制
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -215,7 +184,7 @@ export default function Devices() {
                                         placeholder="如：香港卡1"
                                         value={formData.name}
                                         onChange={(e) =>
-                                            setFormData({...formData, name: e.target.value})
+                                            setFormData({ ...formData, name: e.target.value })
                                         }
                                     />
                                 </div>
@@ -224,7 +193,7 @@ export default function Devices() {
                                     <Select
                                         value={formData.serialPort}
                                         onValueChange={(value) =>
-                                            setFormData({...formData, serialPort: value})
+                                            setFormData({ ...formData, serialPort: value })
                                         }
                                     >
                                         <SelectTrigger>
@@ -245,7 +214,7 @@ export default function Devices() {
                                         placeholder="可选，如：香港"
                                         value={formData.groupName}
                                         onChange={(e) =>
-                                            setFormData({...formData, groupName: e.target.value})
+                                            setFormData({ ...formData, groupName: e.target.value })
                                         }
                                     />
                                 </div>
@@ -254,7 +223,7 @@ export default function Devices() {
                                     <Switch
                                         checked={formData.enabled}
                                         onCheckedChange={(checked) =>
-                                            setFormData({...formData, enabled: checked})
+                                            setFormData({ ...formData, enabled: checked })
                                         }
                                     />
                                 </div>
@@ -271,153 +240,115 @@ export default function Devices() {
                 </div>
             </div>
 
-            {/* 设备列表 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {devices?.map((device) => (
-                    <Card key={device.id} className="relative overflow-hidden">
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
+            {/* 主体：左右布局 */}
+            <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0 pb-10">
+                {/* 左侧：精简设备列表 */}
+                <Card className="w-full lg:w-80 flex flex-col shrink-0 overflow-hidden border-gray-200">
+                    <CardHeader className="py-3 px-4 border-b bg-gray-50/50">
+                        <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                            设备列表
+                            <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                                {devices?.length || 0}
+                            </span>
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-1 overflow-y-auto p-2 space-y-1">
+                        {devices?.map((device) => (
+                            <div
+                                key={device.id}
+                                onClick={() => setSelectedDevice(device)}
+                                className={`group relative flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all border ${
+                                    selectedDevice?.id === device.id
+                                        ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100'
+                                        : 'hover:bg-gray-50 border-transparent hover:border-gray-200'
+                                }`}
+                            >
+                                {/* 状态指示灯 */}
+                                <div className="relative shrink-0">
                                     <div
-                                        className={`w-3 h-3 rounded-full ${getStatusColor(
-                                            device.status
-                                        )} ${device.status === 'online' ? 'animate-pulse' : ''}`}
+                                        className={`w-3 h-3 rounded-full ${
+                                            STATUS_COLORS[device.status as keyof typeof STATUS_COLORS] || STATUS_COLORS.offline
+                                        } ${device.status === 'online' ? 'animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.4)]' : ''}`}
                                     />
-                                    <CardTitle className="text-lg">
-                                        {device.name || '未命名设备'}
-                                    </CardTitle>
                                 </div>
-                                <span
-                                    className={`text-xs px-2 py-1 rounded-full ${
-                                        device.status === 'online'
-                                            ? 'bg-green-100 text-green-700'
-                                            : device.status === 'error'
-                                            ? 'bg-red-100 text-red-700'
-                                            : 'bg-gray-100 text-gray-700'
-                                    }`}
-                                >
-                                    {getStatusText(device.status)}
-                                </span>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {/* 设备信息 */}
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                <div>
-                                    <span className="text-gray-500">串口:</span>
-                                    <span className="ml-1 font-mono text-xs">
-                                        {device.serialPort?.split('/').pop()}
-                                    </span>
-                                </div>
-                                <div>
-                                    <span className="text-gray-500">运营商:</span>
-                                    <span className="ml-1">{device.operator || '-'}</span>
-                                </div>
-                                <div>
-                                    <span className="text-gray-500">号码:</span>
-                                    <span className="ml-1 font-mono text-xs">
-                                        {device.phoneNumber || '-'}
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <span className="text-gray-500">信号:</span>
-                                    <SignalStrength level={device.signalLevel} />
-                                </div>
-                            </div>
 
-                            {/* 分组 */}
-                            {device.groupName && (
-                                <div className="text-xs text-gray-500">
-                                    分组: {device.groupName}
+                                {/* 设备基本信息 */}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                        <p className={`text-sm font-medium truncate ${
+                                            selectedDevice?.id === device.id ? 'text-blue-700' : 'text-gray-900'
+                                        }`}>
+                                            {device.name || '未命名设备'}
+                                        </p>
+                                        <SignalStrength level={device.signalLevel} />
+                                    </div>
+                                    <div className="flex items-center justify-between mt-0.5">
+                                        <p className="text-xs text-gray-500 font-mono truncate">
+                                            {device.serialPort?.split('/').pop()}
+                                        </p>
+                                        {device.flymode && (
+                                            <Plane className="w-3 h-3 text-orange-500" />
+                                        )}
+                                    </div>
                                 </div>
-                            )}
 
-                            {/* 飞行模式状态 */}
-                            {device.flymode && (
-                                <div className="flex items-center gap-1 text-xs text-orange-600">
-                                    <Plane className="w-3 h-3" />
-                                    飞行模式
-                                </div>
-                            )}
-
-                            {/* 操作按钮 */}
-                            <div className="flex items-center justify-between pt-2 border-t">
-                                <div className="flex items-center gap-1">
-                                    <Switch
-                                        checked={device.enabled}
-                                        onCheckedChange={(checked) =>
-                                            toggleEnableMutation.mutate({
-                                                id: device.id,
-                                                enabled: checked,
-                                            })
+                                {/* 删除按钮（仅在非选中或悬停时显示） */}
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity shrink-0"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (confirm('确定要删除这个设备吗？')) {
+                                            deleteMutation.mutate(device.id);
+                                            if (selectedDevice?.id === device.id) setSelectedDevice(null);
                                         }
-                                    />
-                                    <span className="text-xs text-gray-500">
-                                        {device.enabled ? '已启用' : '已禁用'}
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => setSelectedDevice(device)}
-                                        title="设备控制"
-                                    >
-                                        <Settings className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-red-500 hover:text-red-700"
-                                        onClick={() => {
-                                            if (confirm('确定要删除这个设备吗？')) {
-                                                deleteMutation.mutate(device.id);
-                                            }
-                                        }}
-                                        title="删除设备"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
+                                    }}
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
 
-            {/* 空状态 */}
-            {devices?.length === 0 && (
-                <Card className="p-8 text-center">
-                    <div className="text-gray-400 mb-4">
-                        <Wifi className="w-16 h-16 mx-auto" />
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                        暂无设备
-                    </h3>
-                    <p className="text-gray-500 mb-4">
-                        点击上方"添加设备"按钮添加您的第一个 Air780 设备
-                    </p>
-                    <Button onClick={() => setIsAddDialogOpen(true)}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        添加设备
-                    </Button>
+                                {/* 选中指示条 */}
+                                {selectedDevice?.id === device.id && (
+                                    <div className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-blue-500 rounded-r-full" />
+                                )}
+                            </div>
+                        ))}
+
+                        {/* 空状态 */}
+                        {devices?.length === 0 && (
+                            <div className="py-12 text-center">
+                                <Wifi className="w-12 h-12 mx-auto text-gray-200 mb-3" />
+                                <p className="text-sm text-gray-500">暂无设备</p>
+                            </div>
+                        )}
+                    </CardContent>
                 </Card>
-            )}
-            {/* 设备控制弹窗 */}
-            <Dialog open={!!selectedDevice} onOpenChange={(open) => !open && setSelectedDevice(null)}>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>设备控制 - {selectedDevice?.name || selectedDevice?.serialPort}</DialogTitle>
-                    </DialogHeader>
-                    {selectedDevice && (
-                        <DeviceControlPanel
-                            device={devices?.find(d => d.id === selectedDevice.id) || selectedDevice}
-                            onClose={() => setSelectedDevice(null)}
-                        />
+
+                {/* 右侧：沉浸式控制面板 */}
+                <div className="flex-1 min-w-0">
+                    {selectedDevice ? (
+                        <div className="space-y-6 pb-12">
+                            {/* 获取最新状态的设备对象 */}
+                            <DeviceControlPanel
+                                device={devices?.find(d => d.id === selectedDevice.id) || selectedDevice}
+                            />
+                        </div>
+                    ) : (
+                        <Card className="min-h-[400px] lg:h-full border-dashed border-2 bg-gray-50/50 flex flex-col items-center justify-center text-center p-12">
+                            <div className="w-20 h-20 bg-white rounded-full shadow-sm flex items-center justify-center mb-6">
+                                <Settings className="w-10 h-10 text-gray-300 animate-pulse" />
+                            </div>
+                            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                                欢迎进入设备管理中心
+                            </h3>
+                            <p className="text-gray-500 max-w-sm">
+                                请在左侧列表中选择一台设备，以进行短信发送、飞行模式控制及模块重启等操作。
+                            </p>
+                        </Card>
                     )}
-                </DialogContent>
-            </Dialog>
+                </div>
+            </div>
         </div>
     );
 }

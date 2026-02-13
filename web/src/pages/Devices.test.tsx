@@ -71,8 +71,15 @@ describe('Devices Page', () => {
     });
 
     expect(screen.getByText('设备管理')).toBeInTheDocument();
-    expect(screen.getByText('Test Device')).toBeInTheDocument();
-    expect(screen.getByText('13800138000')).toBeInTheDocument();
+    const deviceItem = screen.getByText('Test Device');
+    expect(deviceItem).toBeInTheDocument();
+
+    // 在新布局中，需要点击设备后，手机号才会出现在右侧的控制面板中
+    fireEvent.click(deviceItem);
+
+    await waitFor(() => {
+        expect(screen.getByText('13800138000')).toBeInTheDocument();
+    });
   });
 
   it('opens add device dialog when clicking add button', async () => {

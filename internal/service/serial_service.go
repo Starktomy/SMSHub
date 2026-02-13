@@ -527,8 +527,8 @@ func (s *SerialService) SetFlymode(enabled bool) error {
 	if err := s.sendJSONCommand(cmd); err != nil {
 		return err
 	}
-	// 更新飞行模式状态
-	s.flyMode.Store(enabled)
+	// 注意：不要在这里立即更新 flyMode，设备响应会在 handleStatusResponse 中更新
+	// 乐观更新可能导致状态不一致，因为设备执行需要时间
 	return nil
 }
 

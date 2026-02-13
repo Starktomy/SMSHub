@@ -55,9 +55,9 @@ export default function Layout() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
+        <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col overflow-hidden">
             {/* 顶部导航栏 */}
-            <nav className="bg-white/95 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
+            <nav className="bg-white/95 backdrop-blur-sm border-b border-gray-200 shrink-0 z-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
                         {/* 左侧：Logo 和导航 */}
@@ -167,13 +167,15 @@ export default function Layout() {
                 </div>
             </nav>
 
-            {/* 主要内容区域 */}
-            <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
-                <Outlet/>
+            {/* 主要内容区域：独立滚动 */}
+            <main className="flex-1 overflow-y-auto overflow-x-hidden w-full scroll-smooth">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 min-h-full">
+                    <Outlet/>
+                </div>
             </main>
 
-            {/* 页脚 */}
-            <footer className="bg-white/80 backdrop-blur-sm border-t border-gray-200 mt-auto">
+            {/* 页脚：固定在底部 */}
+            <footer className="bg-white/80 backdrop-blur-sm border-t border-gray-200 shrink-0 z-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="text-center text-xs text-gray-500">
                         <p>SMSHub © 2025 · 版本 {versionQuery.data?.version}</p>

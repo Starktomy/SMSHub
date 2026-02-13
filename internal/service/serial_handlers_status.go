@@ -27,6 +27,8 @@ type StatusData struct {
 		Operator     string  `json:"operator"`     // 运营商名称 (当前网络)
 		SimOperator  string  `json:"sim_operator"` // 运营商名称 (SIM卡归属)
 		Mnc          string  `json:"mnc"`          // 实时网络 MNC/PLMN (来自 Lua)
+		Lac          int     `json:"lac"`          // 实时网络 LAC/TAC
+		Cid          int     `json:"cid"`          // 实时网络 CellID
 		Uptime       int64   `json:"uptime"`       // 模块开机时长，单位为秒
 		Flymode      bool    `json:"flymode"`      // 飞行模式状态
 	} `json:"mobile"`

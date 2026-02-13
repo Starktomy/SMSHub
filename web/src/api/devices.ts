@@ -10,6 +10,8 @@ export interface Device {
   iccid: string;
   operator: string;
   simOperator: string;
+  lac: number;
+  cid: number;
   signalLevel: number;
   flymode: boolean;
   enabled: boolean;

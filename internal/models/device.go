@@ -18,6 +18,8 @@ type Device struct {
 	ICCID       string `gorm:"column:iccid" json:"iccid"`                   // ICCID
 	Operator    string `gorm:"column:operator" json:"operator"`             // 当前网络运营商
 	SimOperator string `gorm:"column:sim_operator" json:"simOperator"`      // SIM卡所属运营商
+	LAC         int    `gorm:"column:lac" json:"lac"`                       // 位置区代码 (LAC/TAC)
+	CID         int    `gorm:"column:cid" json:"cid"`                       // 小区ID (CellID)
 	SignalLevel int    `gorm:"column:signal_level" json:"signalLevel"`      // 信号强度
 	Flymode     bool   `gorm:"column:flymode" json:"flymode"`               // 飞行模式
 	Enabled     bool   `gorm:"column:enabled" json:"enabled"`               // 是否启用

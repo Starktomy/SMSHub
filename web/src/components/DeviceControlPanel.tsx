@@ -181,6 +181,20 @@ export function DeviceControlPanel({ device }: DeviceControlPanelProps) {
                                 </div>
                             </div>
                             <div className="flex justify-between items-center pb-3 border-b border-gray-200">
+                                <span className="text-sm font-medium text-gray-500">基站信息</span>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-[10px] text-gray-400 uppercase">LAC/TAC</span>
+                                        <span className="text-sm font-mono font-medium">{device.lac || '-'}</span>
+                                    </div>
+                                    <div className="w-px h-6 bg-gray-200" />
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-[10px] text-gray-400 uppercase">Cell ID</span>
+                                        <span className="text-sm font-mono font-medium">{device.cid || '-'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                                 <span className="text-sm font-medium text-gray-500">IMSI</span>
                                 <div className="flex flex-col items-end">
                                     <span className="text-sm font-mono font-medium">

@@ -93,16 +93,16 @@ function get_mobile_info()
     info.is_roaming = net_stat == 5
     info.uptime = mcu.ticks2() -- 单位为秒
 
-    -- 获取实时网络信息 (MCC/MNC)
+    -- 获取实时网络信息 (MCC/MNC/LAC/CellID)
     local net_info = mobile.getNetInfo()
     if net_info and net_info.mcc and net_info.mnc then
-        -- 将 mcc/mnc 统一转换为 460/01 这种十进制字符串并拼接
-        -- 这里的 mcc 和 mnc 在不同固件下可能是 number (hex) 或 number (dec)
-        -- 我们直接将其转为 16 进制字符串再转回 10 进制是 LuatOS 处理 MCC/MNC 的常见技巧
         local mcc_str = string.format("%03X", net_info.mcc)
         local mnc_str = string.format("%02X", net_info.mnc)
-        -- 港澳台及国外 MNC 可能是 3 位，这里暂按 2 位处理，后端做模糊匹配
         info.mnc = mcc_str .. mnc_str
+        
+        -- 增加 LAC (或 TAC) 和 CellID
+        info.lac = net_info.lac or net_info.tac or 0
+        info.cid = net_info.cellid or 0
     end
 
     -- https://docs.openluat.com/osapi/core/mobile/#mobileflymodeindex-enable

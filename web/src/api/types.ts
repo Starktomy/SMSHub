@@ -52,7 +52,7 @@ export interface MobileInfo {
     csq: number;
     rsrp: number;
     rsrq: number;
-    number: number;
+    number: string;
     uptime: number;              // 开机时长 (毫秒)
 }
 

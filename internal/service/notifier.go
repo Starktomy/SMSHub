@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/valyala/fasttemplate"
@@ -22,8 +23,10 @@ import (
 
 // Notifier 告警通知服务
 type Notifier struct {
-	logger     *zap.Logger
-	httpClient *http.Client
+	logger         *zap.Logger
+	httpClient     *http.Client
+	proxyClients   map[string]*http.Client // 缓存代理客户端
+	proxyClientsMu sync.Mutex
 }
 
 func NewNotifier(logger *zap.Logger) *Notifier {
@@ -32,6 +35,7 @@ func NewNotifier(logger *zap.Logger) *Notifier {
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
+		proxyClients: make(map[string]*http.Client),
 	}
 }
 
@@ -355,13 +359,8 @@ func (n *Notifier) sendJSONRequestWithProxy(ctx context.Context, url string, pro
 
 	req.Header.Set("Content-Type", "application/json")
 
-	transport := &http.Transport{}
-	transport.Proxy = http.ProxyURL(proxyUrl)
-
-	proxyClient := &http.Client{
-		Timeout:   n.httpClient.Timeout,
-		Transport: transport,
-	}
+	// 获取或创建代理客户端（使用缓存）
+	proxyClient := n.getProxyClient(proxyUrl)
 
 	resp, err := proxyClient.Do(req)
 	if err != nil {
@@ -378,6 +377,30 @@ func (n *Notifier) sendJSONRequestWithProxy(ctx context.Context, url string, pro
 
 	n.logger.Info("通知发送成功", zap.String("url", url), zap.String("response", string(respBody)))
 	return respBody, nil
+}
+
+// getProxyClient 获取或创建代理客户端（带缓存）
+func (n *Notifier) getProxyClient(proxyUrl *url.URL) *http.Client {
+	proxyKey := proxyUrl.String()
+
+	n.proxyClientsMu.Lock()
+	defer n.proxyClientsMu.Unlock()
+
+	if client, exists := n.proxyClients[proxyKey]; exists {
+		return client
+	}
+
+	transport := &http.Transport{
+		Proxy: http.ProxyURL(proxyUrl),
+	}
+
+	client := &http.Client{
+		Timeout:   n.httpClient.Timeout,
+		Transport: transport,
+	}
+
+	n.proxyClients[proxyKey] = client
+	return client
 }
 
 // sendDingTalkByConfig 根据配置发送钉钉通知

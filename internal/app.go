@@ -44,7 +44,7 @@ func setup(app *orz.App) error {
 	db := app.GetDatabase()
 
 	// 1. 数据库迁移
-	if err := autoMigrate(db); err != nil {
+	if err := autoMigrate(db, logger); err != nil {
 		logger.Error("数据库迁移失败", zap.Error(err))
 		return err
 	}
@@ -187,7 +187,7 @@ func setDefaultConfig(appConfig *config.AppConfig, logger *zap.Logger) {
 }
 
 // autoMigrate 数据库迁移
-func autoMigrate(db *gorm.DB) error {
+func autoMigrate(db *gorm.DB, logger *zap.Logger) error {
 	if err := db.AutoMigrate(
 		&models.Property{},
 		&models.TextMessage{},
@@ -198,15 +198,21 @@ func autoMigrate(db *gorm.DB) error {
 	}
 
 	// 数据迁移：将旧的 from/to 字段数据迁移到新字段 from_number/to_number
-	// 忽略错误，因为如果旧列不存在（全新安装），SQL 会执行失败
-	_ = db.Exec("UPDATE text_messages SET from_number = `from` WHERE (from_number IS NULL OR from_number = '') AND `from` IS NOT NULL").Error
-	_ = db.Exec("UPDATE text_messages SET to_number = `to` WHERE (to_number IS NULL OR to_number = '') AND `to` IS NOT NULL").Error
+	// 记录错误而不是忽略，因为如果旧列不存在（全新安装），SQL 会执行失败
+	if err := db.Exec("UPDATE text_messages SET from_number = `from` WHERE (from_number IS NULL OR from_number = '') AND `from` IS NOT NULL").Error; err != nil {
+		logger.Warn("数据迁移 from 字段失败", zap.Error(err))
+	}
+	if err := db.Exec("UPDATE text_messages SET to_number = `to` WHERE (to_number IS NULL OR to_number = '') AND `to` IS NOT NULL").Error; err != nil {
+		logger.Warn("数据迁移 to 字段失败", zap.Error(err))
+	}
 
 	// 数据迁移：从 icc_id 迁移到 iccid
 	var hasIccId int64
 	db.Raw("SELECT COUNT(*) FROM pragma_table_info('devices') WHERE name = 'icc_id'").Scan(&hasIccId)
 	if hasIccId > 0 {
-		_ = db.Exec("UPDATE devices SET iccid = icc_id WHERE (iccid IS NULL OR iccid = '') AND icc_id IS NOT NULL AND icc_id != ''").Error
+		if err := db.Exec("UPDATE devices SET iccid = icc_id WHERE (iccid IS NULL OR iccid = '') AND icc_id IS NOT NULL AND icc_id != ''").Error; err != nil {
+			logger.Warn("数据迁移 icc_id 字段失败", zap.Error(err))
+		}
 	}
 
 	return nil

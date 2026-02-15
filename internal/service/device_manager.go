@@ -30,6 +30,8 @@ const (
 	HeartbeatTimeout = 60 * time.Second
 	// 健康检查间隔
 	HealthCheckInterval = 10 * time.Second
+	// 批量发送并发限制
+	MaxConcurrentSends = 5
 )
 
 // ManagedDevice 管理的设备（包含运行时状态）
@@ -281,6 +283,7 @@ func (dm *DeviceManager) checkDevicesHealth() {
 	for _, id := range deviceIDs {
 		device, err := dm.repo.FindById(ctx, id)
 		if err != nil {
+			dm.logger.Warn("检查设备健康状态失败", zap.String("id", id), zap.Error(err))
 			continue
 		}
 
@@ -288,14 +291,17 @@ func (dm *DeviceManager) checkDevicesHealth() {
 		lastSeen := time.UnixMilli(device.LastSeenAt)
 		if now.Sub(lastSeen) > HeartbeatTimeout {
 			if device.Status != models.DeviceStatusOffline {
-				_ = dm.repo.UpdateColumnsById(ctx, id, map[string]any{
+				if err := dm.repo.UpdateColumnsById(ctx, id, map[string]any{
 					"status":       models.DeviceStatusOffline,
 					"signal_level": 0,
 					"operator":     "",
-				})
-				dm.logger.Warn("设备心跳超时，标记为离线",
-					zap.String("id", id),
-					zap.String("name", device.Name))
+				}); err != nil {
+					dm.logger.Error("更新设备状态失败", zap.String("id", id), zap.Error(err))
+				} else {
+					dm.logger.Warn("设备心跳超时，标记为离线",
+						zap.String("id", id),
+						zap.String("name", device.Name))
+				}
 			}
 		}
 	}
@@ -357,7 +363,9 @@ func (dm *DeviceManager) UpdateDevice(ctx context.Context, device *models.Device
 
 	if needRestart {
 		// 停止旧设备
-		_ = dm.stopDevice(device.ID)
+		if err := dm.stopDevice(device.ID); err != nil {
+			dm.logger.Warn("停止旧设备失败", zap.String("id", device.ID), zap.Error(err))
+		}
 
 		// 如果启用，启动新设备
 		if device.Enabled {
@@ -373,7 +381,9 @@ func (dm *DeviceManager) UpdateDevice(ctx context.Context, device *models.Device
 // DeleteDevice 删除设备
 func (dm *DeviceManager) DeleteDevice(ctx context.Context, id string) error {
 	// 先停止设备
-	_ = dm.stopDevice(id)
+	if err := dm.stopDevice(id); err != nil {
+		dm.logger.Warn("删除设备时停止设备失败", zap.String("id", id), zap.Error(err))
+	}
 
 	return dm.repo.DeleteById(ctx, id)
 }
@@ -519,33 +529,47 @@ type BatchSendResult struct {
 func (dm *DeviceManager) BatchSendSMS(req *BatchSendRequest) []BatchSendResult {
 	results := make([]BatchSendResult, len(req.Recipients))
 
+	// 使用带缓冲的 channel 实现并发限制
+	semaphore := make(chan struct{}, MaxConcurrentSends)
+	var wg sync.WaitGroup
+
 	for i, recipient := range req.Recipients {
-		result := BatchSendResult{Recipient: recipient}
+		wg.Add(1)
+		go func(index int, recipient string) {
+			defer wg.Done()
 
-		var msgID, deviceID string
-		var err error
+			// 获取信号量，控制并发数
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
 
-		if req.DeviceID != "" {
-			// 指定设备发送
-			msgID, err = dm.SendSMSByDevice(req.DeviceID, recipient, req.Content)
-			deviceID = req.DeviceID
-		} else {
-			// 按策略选择设备
-			msgID, deviceID, err = dm.SendSMS(recipient, req.Content, req.Strategy)
-		}
+			result := BatchSendResult{Recipient: recipient}
 
-		if err != nil {
-			result.Success = false
-			result.Error = err.Error()
-		} else {
-			result.Success = true
-			result.MessageID = msgID
-			result.DeviceID = deviceID
-		}
+			var msgID, deviceID string
+			var err error
 
-		results[i] = result
+			if req.DeviceID != "" {
+				// 指定设备发送
+				msgID, err = dm.SendSMSByDevice(req.DeviceID, recipient, req.Content)
+				deviceID = req.DeviceID
+			} else {
+				// 按策略选择设备
+				msgID, deviceID, err = dm.SendSMS(recipient, req.Content, req.Strategy)
+			}
+
+			if err != nil {
+				result.Success = false
+				result.Error = err.Error()
+			} else {
+				result.Success = true
+				result.MessageID = msgID
+				result.DeviceID = deviceID
+			}
+
+			results[index] = result
+		}(i, recipient)
 	}
 
+	wg.Wait()
 	return results
 }
 
@@ -574,6 +598,9 @@ func (dm *DeviceManager) selectDevice(strategy SendStrategy) (*models.Device, er
 }
 
 func (dm *DeviceManager) selectRoundRobin(devices []models.Device) *models.Device {
+	if len(devices) == 0 {
+		return nil
+	}
 	dm.roundRobinMu.Lock()
 	defer dm.roundRobinMu.Unlock()
 
@@ -583,11 +610,17 @@ func (dm *DeviceManager) selectRoundRobin(devices []models.Device) *models.Devic
 }
 
 func (dm *DeviceManager) selectRandom(devices []models.Device) *models.Device {
+	if len(devices) == 0 {
+		return nil
+	}
 	return &devices[rand.Intn(len(devices))]
 }
 
 func (dm *DeviceManager) selectBestSignal(devices []models.Device) *models.Device {
 	// devices 已按 signal_level DESC 排序
+	if len(devices) == 0 {
+		return nil
+	}
 	return &devices[0]
 }
 

@@ -28,6 +28,8 @@ const (
 	CacheRefreshInterval = 10 * time.Second
 	// 缓存过期时间
 	CacheTTL = 5 * time.Minute
+	// 默认读取超时
+	defaultReadTimeout = 5 * time.Second
 )
 
 type ScheduledTaskStatusUpdater func(ctx context.Context, msgID string, status models.LastRunStatus) error
@@ -366,6 +368,14 @@ func (s *SerialService) listenSerialData(connCtx context.Context, connCancel con
 
 	reader := bufio.NewReader(s.port)
 
+	// 设置默认读取超时 (5秒)
+	const defaultReadTimeout = 5 * time.Second
+
+	// 初始化读取超时
+	if err := s.port.SetReadTimeout(defaultReadTimeout); err != nil {
+		s.logger.Warn("设置读取超时失败", zap.Error(err))
+	}
+
 	for {
 		select {
 		case <-connCtx.Done():
@@ -382,6 +392,10 @@ func (s *SerialService) listenSerialData(connCtx context.Context, connCancel con
 				// 检查 context 是否已取消
 				if connCtx.Err() != nil {
 					return
+				}
+				// 超时错误可以忽略，继续读取
+				if isTimeoutError(err) {
+					continue
 				}
 				// 其他错误，可能是设备断开或硬件错误
 				s.logger.Error("读取串口数据错误，退出监听", zap.Error(err))
@@ -478,8 +492,9 @@ func (s *SerialService) SendSMS(to, content string) (string, error) {
 	if err := s.sendJSONCommand(cmd); err != nil {
 		s.logger.Error("发送短信命令失败", zap.Error(err))
 		// 更新状态为失败
-		// 更新状态为失败
-		_ = s.textMsgService.UpdateStatusById(ctx, msgID, models.MessageStatusFailed)
+		if updateErr := s.textMsgService.UpdateStatusById(ctx, msgID, models.MessageStatusFailed); updateErr != nil {
+			s.logger.Warn("更新消息状态失败", zap.String("msgID", msgID), zap.Error(updateErr))
+		}
 		return "", err
 	}
 
@@ -554,11 +569,33 @@ func (s *SerialService) sendJSONCommand(cmd any) error {
 		return err
 	}
 
+	// 设置写入超时 (5秒) - 使用 SetReadTimeout 实现
+	if err := s.port.SetReadTimeout(5 * time.Second); err != nil {
+		return fmt.Errorf("设置写入超时失败: %w", err)
+	}
+
 	_, err = s.port.Write(message)
 	if err != nil {
 		return fmt.Errorf("串口写入失败: %w", err)
 	}
 	s.logger.Sugar().Debugf("send command: %s", jsonData)
 
+	// 恢复读取超时
+	if err := s.port.SetReadTimeout(defaultReadTimeout); err != nil {
+		s.logger.Warn("恢复读取超时失败", zap.Error(err))
+	}
+
 	return nil
+}
+
+// isTimeoutError 检查错误是否为超时错误
+func isTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// 检查常见超时错误类型
+	errStr := err.Error()
+	return strings.Contains(errStr, "timeout") ||
+		strings.Contains(errStr, "i/o timeout") ||
+		strings.Contains(errStr, "timed out")
 }

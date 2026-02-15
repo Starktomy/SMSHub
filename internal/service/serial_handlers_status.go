@@ -55,7 +55,7 @@ func (s *SerialService) handleStatusResponse(msg *ParsedMessage) {
 
 	// 3. 处理运营商
 	// (A) SIM卡归属运营商 - 基于 IMSI
-	if len(statusData.Mobile.Imsi) > 5 {
+	if len(statusData.Mobile.Imsi) >= 5 {
 		simPlmn := statusData.Mobile.Imsi[:5]
 		statusData.Mobile.SimOperator = func() string {
 			if v, ok := OperData[simPlmn]; ok {

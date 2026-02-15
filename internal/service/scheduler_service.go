@@ -235,7 +235,9 @@ func (s *SchedulerService) executeTask(task models.ScheduledTask) error {
 			zap.String("id", task.ID),
 			zap.String("name", task.Name),
 			zap.Error(err))
-		_ = s.UpdateLastRun(ctx, task.ID, msgId, models.LastRunStatusFailed)
+		if updateErr := s.UpdateLastRun(ctx, task.ID, msgId, models.LastRunStatusFailed); updateErr != nil {
+			s.logger.Warn("更新定时任务状态失败", zap.String("id", task.ID), zap.Error(updateErr))
+		}
 		return err
 	}
 
@@ -244,7 +246,9 @@ func (s *SchedulerService) executeTask(task models.ScheduledTask) error {
 		zap.String("name", task.Name))
 
 	// 更新任务的 LastRunAt 字段到数据库
-	_ = s.UpdateLastRun(ctx, task.ID, msgId, models.LastRunStatusUnknown)
+	if err := s.UpdateLastRun(ctx, task.ID, msgId, models.LastRunStatusUnknown); err != nil {
+		s.logger.Warn("更新定时任务状态失败", zap.String("id", task.ID), zap.Error(err))
+	}
 
 	return nil
 }

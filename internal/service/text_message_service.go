@@ -42,6 +42,7 @@ type Conversation struct {
 	LastMessage  *models.TextMessage `json:"lastMessage"`  // 最后一条消息
 	MessageCount int64               `json:"messageCount"` // 消息总数
 	UnreadCount  int64               `json:"unreadCount"`  // 未读数量（暂时为0）
+	LastTime     int64               `json:"-"`            // 最后消息时间（用于排序，不暴露给前端）
 }
 
 // Save 保存短信记录
@@ -93,24 +94,35 @@ func (s *TextMessageService) GetStats(ctx context.Context) (*Stats, error) {
 
 	stats := &Stats{}
 
-	// 总数
-	if err := db.Model(&models.TextMessage{}).Count(&stats.TotalCount).Error; err != nil {
-		return nil, fmt.Errorf("统计总数失败: %w", err)
+	// 使用单次聚合查询获取所有统计数据
+	type countResult struct {
+		TotalCount    int64
+		IncomingCount int64
+		OutgoingCount int64
 	}
 
-	// 接收数量
-	if err := db.Model(&models.TextMessage{}).Where("type = ?", "incoming").Count(&stats.IncomingCount).Error; err != nil {
-		return nil, fmt.Errorf("统计接收数量失败: %w", err)
-	}
-
-	// 发送数量
-	if err := db.Model(&models.TextMessage{}).Where("type = ?", "outgoing").Count(&stats.OutgoingCount).Error; err != nil {
-		return nil, fmt.Errorf("统计发送数量失败: %w", err)
-	}
-
-	// 今日数量（按 created_at 字段）
+	result := countResult{}
 	todayStart := time.Now().Truncate(24 * time.Hour).UnixMilli()
-	if err := db.Model(&models.TextMessage{}).Where("created_at >= ?", todayStart).Count(&stats.TodayCount).Error; err != nil {
+
+	// 使用 CASE WHEN 表达式在单次查询中获取所有计数
+	if err := db.Model(&models.TextMessage{}).
+		Select(`
+			COUNT(*) as total_count,
+			COUNT(CASE WHEN type = 'incoming' THEN 1 END) as incoming_count,
+			COUNT(CASE WHEN type = 'outgoing' THEN 1 END) as outgoing_count
+		`).
+		Scan(&result).Error; err != nil {
+		return nil, fmt.Errorf("统计失败: %w", err)
+	}
+
+	stats.TotalCount = result.TotalCount
+	stats.IncomingCount = result.IncomingCount
+	stats.OutgoingCount = result.OutgoingCount
+
+	// 今日数量单独查询（因为需要动态计算日期）
+	if err := db.Model(&models.TextMessage{}).
+		Where("created_at >= ?", todayStart).
+		Count(&stats.TodayCount).Error; err != nil {
 		return nil, fmt.Errorf("统计今日数量失败: %w", err)
 	}
 
@@ -127,64 +139,64 @@ func (s *TextMessageService) UpdateStatusById(ctx context.Context, id string, st
 func (s *TextMessageService) GetConversations(ctx context.Context) ([]*Conversation, error) {
 	db := s.repo.GetDB(ctx)
 
-	// 使用 SQL 聚合查询获取每个 peer 的消息计数和最后消息时间
+	// 使用 UNION 将 incoming 和 outgoing 查询合并为一次
+	// 先获取每个 peer 的消息数和最后消息时间
 	type peerSummary struct {
 		Peer         string
 		MessageCount int64
 		LastTime     int64
 	}
 
-	var incomingSummaries []peerSummary
-	if err := db.Model(&models.TextMessage{}).
-		Select(`from_number as peer, COUNT(*) as message_count, MAX(created_at) as last_time`).
-		Where("type = ?", models.MessageTypeIncoming).
-		Group(`from_number`).
-		Having(`from_number != ''`).
-		Find(&incomingSummaries).Error; err != nil {
-		return nil, fmt.Errorf("获取接收消息统计失败: %w", err)
+	// 使用 UNION ALL 合并查询（比 UNION 快，因为不进行去重）
+	unionQuery := `
+		SELECT from_number as peer, COUNT(*) as message_count, MAX(created_at) as last_time
+		FROM text_messages
+		WHERE type = 'incoming' AND from_number != ''
+		GROUP BY from_number
+		UNION ALL
+		SELECT to_number as peer, COUNT(*) as message_count, MAX(created_at) as last_time
+		FROM text_messages
+		WHERE type = 'outgoing' AND to_number != ''
+		GROUP BY to_number
+	`
+
+	var summaries []peerSummary
+	if err := db.Raw(unionQuery).Scan(&summaries).Error; err != nil {
+		return nil, fmt.Errorf("获取会话统计失败: %w", err)
 	}
 
-	var outgoingSummaries []peerSummary
-	if err := db.Model(&models.TextMessage{}).
-		Select(`to_number as peer, COUNT(*) as message_count, MAX(created_at) as last_time`).
-		Where("type = ?", models.MessageTypeOutgoing).
-		Group(`to_number`).
-		Having(`to_number != ''`).
-		Find(&outgoingSummaries).Error; err != nil {
-		return nil, fmt.Errorf("获取发送消息统计失败: %w", err)
-	}
-
-	// 合并统计结果
+	// 合并统计结果（合并相同 peer 的数据）
 	peerMap := make(map[string]*Conversation)
-	for _, s := range incomingSummaries {
-		peerMap[s.Peer] = &Conversation{
-			Peer:         s.Peer,
-			MessageCount: s.MessageCount,
-		}
-	}
-	for _, s := range outgoingSummaries {
+	for _, s := range summaries {
 		if conv, exists := peerMap[s.Peer]; exists {
 			conv.MessageCount += s.MessageCount
+			if s.LastTime > conv.LastMessage.CreatedAt {
+				conv.LastTime = s.LastTime
+			}
 		} else {
 			peerMap[s.Peer] = &Conversation{
 				Peer:         s.Peer,
 				MessageCount: s.MessageCount,
+				LastTime:     s.LastTime,
 			}
 		}
 	}
 
-	// 获取每个 peer 的最后一条消息
+	// 批量获取每个 peer 的最后一条消息（使用子查询优化）
 	for peer, conv := range peerMap {
 		var lastMsg models.TextMessage
-		if err := db.Where("(type = ? AND from_number = ?) OR (type = ? AND to_number = ?)",
-			models.MessageTypeIncoming, peer,
-			models.MessageTypeOutgoing, peer,
-		).Order("created_at DESC").First(&lastMsg).Error; err != nil {
+		// 使用子查询获取每个 peer 的最后消息
+		subQuery := `
+			SELECT * FROM text_messages
+			WHERE (type = 'incoming' AND from_number = ?) OR (type = 'outgoing' AND to_number = ?)
+			ORDER BY created_at DESC
+			LIMIT 1
+		`
+		if err := db.Raw(subQuery, peer, peer).First(&lastMsg).Error; err != nil {
 			continue
 		}
 		conv.LastMessage = &lastMsg
 		conv.UnreadCount = 0 // 暂时不实现未读计数
-		peerMap[peer] = conv
 	}
 
 	// 转换为切片

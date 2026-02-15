@@ -11,6 +11,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// defaultContextTimeout 用于异步操作的默认超时时间
+const defaultContextTimeout = 30 * time.Second
+
 // IncomingSMS 接收的短信消息结构
 type IncomingSMS struct {
 	Timestamp int64  `json:"timestamp"`
@@ -46,8 +49,10 @@ func (s *SerialService) handleIncomingSMS(msg *ParsedMessage) {
 		zap.String("content", sms.Content),
 		zap.Int64("timestamp", sms.Timestamp))
 
-	// 保存短信记录
-	ctx := context.Background()
+	// 保存短信记录 - 使用带超时的 context
+	ctx, cancel := context.WithTimeout(context.Background(), defaultContextTimeout)
+	defer cancel()
+
 	record := &models.TextMessage{
 		ID:         uuid.NewString(),
 		From:       sms.From,
@@ -64,8 +69,10 @@ func (s *SerialService) handleIncomingSMS(msg *ParsedMessage) {
 		s.logger.Error("保存短信记录失败", zap.Error(err))
 	}
 
-	// 异步发送通知
-	go s.sendNotification(ctx, sms)
+	// 异步发送通知 - 使用新的 context 避免被父 context 取消
+	notificationCtx, notificationCancel := context.WithTimeout(context.Background(), defaultContextTimeout)
+	defer notificationCancel()
+	go s.sendNotification(notificationCtx, sms)
 }
 
 // sendNotification 发送通知
@@ -136,7 +143,10 @@ func (s *SerialService) handleSMSSendResult(msg *ParsedMessage) {
 		return
 	}
 
-	ctx := context.Background()
+	// 使用带超时的 context
+	ctx, cancel := context.WithTimeout(context.Background(), defaultContextTimeout)
+	defer cancel()
+
 	var status models.MessageStatus
 	var lastRunStatus models.LastRunStatus
 	if success {
@@ -151,12 +161,16 @@ func (s *SerialService) handleSMSSendResult(msg *ParsedMessage) {
 		s.logger.Warn("短信发送失败",
 			zap.String("to", to),
 			zap.String("request_id", requestID))
-		go s.sendNotificationMessage(context.Background(), NotificationMessage{
+		// 发送失败通知 - 使用独立的 context 和超时
+		notificationCtx, notificationCancel := context.WithTimeout(context.Background(), defaultContextTimeout)
+		defer notificationCancel()
+		go s.sendNotificationMessage(notificationCtx, NotificationMessage{
 			Type:      "sms",
 			From:      "UART 短信转发器",
 			Content:   fmt.Sprintf("短信发送失败: %s", to),
 			Timestamp: time.Now().Unix(),
 		})
+		_ = notificationCancel // 避免未使用的警告
 	}
 
 	if err := s.textMsgService.UpdateStatusById(ctx, requestID, status); err != nil {

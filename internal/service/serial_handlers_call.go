@@ -26,7 +26,10 @@ func (s *SerialService) handleIncomingCall(msg *ParsedMessage) {
 		zap.String("from", call.From),
 		zap.Int64("timestamp", call.Timestamp))
 
-	// 转换为通用通知消息并发送
+	// 转换为通用通知消息并发送 - 使用带超时的 context
+	notificationCtx, notificationCancel := context.WithTimeout(context.Background(), defaultContextTimeout)
+	defer notificationCancel()
+
 	notifMsg := NotificationMessage{
 		Type:      "call",
 		From:      call.From,
@@ -34,7 +37,7 @@ func (s *SerialService) handleIncomingCall(msg *ParsedMessage) {
 		Timestamp: call.Timestamp,
 	}
 
-	go s.sendNotificationMessage(context.Background(), notifMsg)
+	go s.sendNotificationMessage(notificationCtx, notifMsg)
 }
 
 // handleCallDisconnected 处理通话结束通知
